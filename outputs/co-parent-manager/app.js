@@ -31,6 +31,7 @@ const defaultState = {
   supportRequests: [],
   schoolOptions: [],
   homeworkItems: [],
+  chatMessages: [],
   messages: []
 };
 
@@ -175,6 +176,7 @@ function render() {
   renderSupportRequests();
   renderSchoolOptions();
   renderHomeworkItems();
+  renderChatImports();
   renderMessages();
   renderAgreements();
   renderSettings();
@@ -200,6 +202,7 @@ function renderDashboard() {
   $("#openSupportCount").textContent = openSupportRequests.length;
   $("#openHomeworkCount").textContent = openHomework.length;
   $("#schoolDecisionCount").textContent = schoolDecisions.length;
+  $("#chatMessageCount").textContent = state.chatMessages.length;
 
   const upcoming = sortByDueDate(openReminders).slice(0, 5);
   $("#upcomingList").innerHTML = upcoming.length
@@ -386,6 +389,121 @@ function renderHomeworkItems() {
     : emptyState("No homework items match this filter.");
 }
 
+function chatCategoryFromName(name) {
+  const lowered = name.toLowerCase();
+  if (lowered.includes("calendar")) return "calendar";
+  if (lowered.includes("household")) return "household";
+  if (lowered.includes("expense")) return "expense";
+  if (lowered.includes("gratitude")) return "gratitude";
+  if (lowered.includes("healthcare")) return "healthcare";
+  if (lowered.includes("co-parent")) return "central";
+  return "direct";
+}
+
+function chatCategoryLabel(category) {
+  return {
+    calendar: "Calendar",
+    household: "Household",
+    expense: "Expense",
+    gratitude: "Gratitude",
+    healthcare: "Healthcare",
+    central: "Co-Parent Central",
+    direct: "Direct"
+  }[category] || "Direct";
+}
+
+function parseWhatsAppDate(rawDate, rawTime, meridiem) {
+  const [month, day, yearPart] = rawDate.split("/").map((part) => Number(part));
+  let [hour, minute, second] = rawTime.split(":").map((part) => Number(part));
+  const year = yearPart < 100 ? 2000 + yearPart : yearPart;
+  if (meridiem) {
+    const marker = meridiem.toUpperCase();
+    if (marker === "PM" && hour < 12) hour += 12;
+    if (marker === "AM" && hour === 12) hour = 0;
+  }
+  return new Date(year, month - 1, day, hour, minute, second || 0).toISOString();
+}
+
+function parseWhatsAppText(text, sourceName) {
+  const category = chatCategoryFromName(sourceName);
+  const entries = [];
+  const lines = text.replace(/\r\n/g, "\n").replace(/\u202f/g, " ").split("\n");
+  const startPattern = /^\[(\d{1,2}\/\d{1,2}\/\d{2,4}),\s+(\d{1,2}:\d{2}(?::\d{2})?)\s*([AP]M)?\]\s([^:]+):\s([\s\S]*)$/i;
+  for (const line of lines) {
+    const match = line.match(startPattern);
+    if (match) {
+      entries.push({
+        id: crypto.randomUUID(),
+        source: sourceName,
+        category,
+        timestamp: parseWhatsAppDate(match[1], match[2], match[3]),
+        sender: match[4].trim(),
+        text: match[5].trim()
+      });
+    } else if (entries.length && line.trim()) {
+      entries[entries.length - 1].text += `\n${line.trim()}`;
+    }
+  }
+  return entries.filter((entry) => entry.text && !entry.text.includes("<Media omitted>"));
+}
+
+function chatItemTemplate(item) {
+  return `
+    <div class="item" data-chat-id="${item.id}">
+      <div class="item-header">
+        <div>
+          <p class="item-title">${escapeHtml(item.sender)}</p>
+          <p class="item-meta">${chatCategoryLabel(item.category)} · ${new Date(item.timestamp).toLocaleString()} · ${escapeHtml(item.source)}</p>
+        </div>
+        <span class="pill">${chatCategoryLabel(item.category)}</span>
+      </div>
+      <p>${escapeHtml(item.text)}</p>
+      <div class="item-actions">
+        <button class="ghost" type="button" data-action="log-chat-message" data-id="${item.id}">Add to communication log</button>
+        <button class="secondary" type="button" data-action="draft-from-chat" data-id="${item.id}"><i data-lucide="wand-2"></i><span>Draft reply</span></button>
+      </div>
+    </div>
+  `;
+}
+
+function renderChatImports() {
+  const search = $("#chatSearch").value.trim().toLowerCase();
+  const category = $("#chatCategoryFilter").value;
+  const sender = $("#chatSenderFilter").value.trim().toLowerCase();
+  const filtered = state.chatMessages.filter((item) => {
+    const matchesCategory = category === "all" || item.category === category;
+    const matchesSender = !sender || item.sender.toLowerCase().includes(sender);
+    const matchesSearch = !search || [item.sender, item.text, item.source, item.category].join(" ").toLowerCase().includes(search);
+    return matchesCategory && matchesSender && matchesSearch;
+  }).slice(0, 100);
+  $("#chatImportCount").textContent = `${state.chatMessages.length} message${state.chatMessages.length === 1 ? "" : "s"}`;
+  $("#chatImportList").innerHTML = filtered.length
+    ? filtered.map(chatItemTemplate).join("")
+    : emptyState("No imported messages match this filter.");
+}
+
+async function readWhatsAppFile(file) {
+  if (file.name.toLowerCase().endsWith(".txt")) {
+    return parseWhatsAppText(await file.text(), file.name);
+  }
+  if (!window.JSZip) throw new Error("ZIP support is still loading. Try again in a moment.");
+  const zip = await window.JSZip.loadAsync(file);
+  const chatFileName = Object.keys(zip.files).find((name) => name.toLowerCase().endsWith("_chat.txt"));
+  if (!chatFileName) return [];
+  const text = await zip.files[chatFileName].async("text");
+  return parseWhatsAppText(text, file.name.replace(/\.zip$/i, ""));
+}
+
+function dedupeChatMessages(messages) {
+  const seen = new Set();
+  return messages.filter((item) => {
+    const key = `${item.source}|${item.timestamp}|${item.sender}|${item.text}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
 function messageItemTemplate(item) {
   return `
     <div class="item">
@@ -539,6 +657,47 @@ function bindEvents() {
 
   $("#homeworkFilter").addEventListener("change", renderHomeworkItems);
 
+  $("#whatsappImport").addEventListener("change", async (event) => {
+    const files = [...event.target.files];
+    if (!files.length) return;
+    try {
+      const imported = [];
+      for (const file of files) {
+        imported.push(...await readWhatsAppFile(file));
+      }
+      state.chatMessages = dedupeChatMessages([...state.chatMessages, ...imported])
+        .sort((a, b) => b.timestamp.localeCompare(a.timestamp));
+      saveState();
+      render();
+      showToast(`Imported ${imported.length} message${imported.length === 1 ? "" : "s"}`);
+    } catch (error) {
+      showToast(error.message || "WhatsApp import failed");
+    } finally {
+      event.target.value = "";
+    }
+  });
+
+  $("#chatSearch").addEventListener("input", renderChatImports);
+  $("#chatCategoryFilter").addEventListener("change", renderChatImports);
+  $("#chatSenderFilter").addEventListener("input", renderChatImports);
+
+  $("#clearChatImports").addEventListener("click", () => {
+    state.chatMessages = [];
+    saveState();
+    render();
+    showToast("Imported chats cleared");
+  });
+
+  $("#exportChatImports").addEventListener("click", () => {
+    const blob = new Blob([JSON.stringify({ chatMessages: state.chatMessages }, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `parent-manager-whatsapp-${new Date().toISOString().slice(0, 10)}.json`;
+    link.click();
+    URL.revokeObjectURL(url);
+  });
+
   document.addEventListener("click", (event) => {
     const button = event.target.closest("[data-action]");
     if (!button) return;
@@ -618,6 +777,32 @@ function bindEvents() {
       saveState();
       render();
       showToast("Homework item deleted");
+    }
+    if (action === "log-chat-message") {
+      const item = state.chatMessages.find((message) => message.id === id);
+      state.messages.unshift({
+        id: crypto.randomUUID(),
+        topic: `${chatCategoryLabel(item.category)} WhatsApp message`,
+        text: `${item.sender} (${new Date(item.timestamp).toLocaleString()}):\n${item.text}`,
+        createdAt: new Date().toISOString()
+      });
+      saveState();
+      render();
+      showToast("Message added to log");
+    }
+    if (action === "draft-from-chat") {
+      const item = state.chatMessages.find((message) => message.id === id);
+      switchView("mediator");
+      $("#messageForm").topic.value = `${chatCategoryLabel(item.category)} follow-up`;
+      $("#messageForm").facts.value = `${item.sender} wrote on ${new Date(item.timestamp).toLocaleString()}:\n${item.text}`;
+      $("#draftText").value = generateDraft({
+        topic: `${chatCategoryLabel(item.category)} follow-up`,
+        facts: $("#messageForm").facts.value,
+        goal: "deescalate",
+        tone: "brief"
+      });
+      updateDraftActions($("#draftText").value);
+      showToast("Draft created from WhatsApp message");
     }
     if (action === "delete-agreement") {
       state.agreements = state.agreements.filter((item) => item.id !== id);
@@ -702,6 +887,7 @@ function bindEvents() {
     try {
       const imported = JSON.parse(await file.text());
       const isProfileOnly = imported.settings && !["reminders", "agreements", "supportRequests", "schoolOptions", "homeworkItems", "messages"].some((key) => key in imported);
+      const isChatArchiveOnly = Array.isArray(imported.chatMessages) && Object.keys(imported).every((key) => key === "chatMessages");
       if (isProfileOnly) {
         state = {
           ...state,
@@ -709,6 +895,12 @@ function bindEvents() {
             ...state.settings,
             ...imported.settings
           }
+        };
+      } else if (isChatArchiveOnly) {
+        state = {
+          ...state,
+          chatMessages: dedupeChatMessages([...state.chatMessages, ...imported.chatMessages])
+            .sort((a, b) => b.timestamp.localeCompare(a.timestamp))
         };
       } else {
         state = {
@@ -722,7 +914,7 @@ function bindEvents() {
       }
       saveState();
       render();
-      showToast(isProfileOnly ? "Profile imported" : "Data imported");
+      showToast(isProfileOnly ? "Profile imported" : isChatArchiveOnly ? "Chat archive imported" : "Data imported");
     } catch {
       showToast("Import failed");
     } finally {

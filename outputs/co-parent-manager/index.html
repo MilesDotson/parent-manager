@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Parent Manager</title>
     <link rel="stylesheet" href="./styles.css" />
+    <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js" defer></script>
     <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js" defer></script>
     <script src="./app.js" defer></script>
   </head>
@@ -38,6 +39,9 @@
         </button>
         <button class="nav-item" type="button" data-view="school">
           <i data-lucide="graduation-cap"></i><span>School</span>
+        </button>
+        <button class="nav-item" type="button" data-view="whatsapp">
+          <i data-lucide="message-circle"></i><span>WhatsApp</span>
         </button>
         <button class="nav-item" type="button" data-view="mediator">
           <i data-lucide="messages-square"></i><span>Mediator</span>
@@ -82,6 +86,10 @@
             <article class="metric">
               <span id="schoolDecisionCount">0</span>
               <p>School decisions</p>
+            </article>
+            <article class="metric">
+              <span id="chatMessageCount">0</span>
+              <p>Imported chats</p>
             </article>
           </div>
 
@@ -402,6 +410,67 @@
               <div id="homeworkList" class="stack"></div>
             </article>
           </div>
+        </section>
+
+        <section class="view" id="whatsapp">
+          <div class="section-heading">
+            <div>
+              <p class="eyebrow">Private local import</p>
+              <h2>WhatsApp chat archive</h2>
+            </div>
+          </div>
+
+          <div class="split">
+            <article class="panel form">
+              <h3>Import WhatsApp exports</h3>
+              <label class="icon-button file-button">
+                <i data-lucide="archive"></i><span>Select ZIP or TXT exports</span>
+                <input id="whatsappImport" type="file" accept=".zip,.txt,text/plain,application/zip" multiple />
+              </label>
+              <p class="note">Imported messages stay in this browser's local storage. They are not uploaded to GitHub Pages and are not written into the public source code.</p>
+              <div class="button-row">
+                <button class="ghost danger" id="clearChatImports" type="button">Clear imported chats</button>
+                <button class="secondary" id="exportChatImports" type="button">
+                  <i data-lucide="download"></i><span>Export chat archive</span>
+                </button>
+              </div>
+            </article>
+
+            <article class="panel form">
+              <h3>Search imported chats</h3>
+              <label>
+                <span>Search</span>
+                <input id="chatSearch" placeholder="school, homework, pickup, reimbursement, doctor" />
+              </label>
+              <div class="two-col">
+                <label>
+                  <span>Category</span>
+                  <select id="chatCategoryFilter">
+                    <option value="all">All</option>
+                    <option value="calendar">Calendar</option>
+                    <option value="household">Household</option>
+                    <option value="expense">Expense</option>
+                    <option value="gratitude">Gratitude</option>
+                    <option value="healthcare">Healthcare</option>
+                    <option value="central">Co-Parent Central</option>
+                    <option value="direct">Direct</option>
+                  </select>
+                </label>
+                <label>
+                  <span>Sender</span>
+                  <input id="chatSenderFilter" placeholder="Miles or Swan" />
+                </label>
+              </div>
+            </article>
+          </div>
+
+          <article class="panel section-spacer">
+            <div class="panel-title">
+              <h3>Imported messages</h3>
+              <span class="pill" id="chatImportCount">0 messages</span>
+            </div>
+            <div id="chatImportList" class="stack"></div>
+          </article>
         </section>
 
         <section class="view" id="mediator">
