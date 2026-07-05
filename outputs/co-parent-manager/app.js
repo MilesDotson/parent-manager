@@ -173,6 +173,7 @@ function generateDraft({ topic, facts, goal, tone }) {
 }
 
 function render() {
+  renderAgentDesk();
   renderPlanner();
   renderDashboard();
   renderReminders();
@@ -188,6 +189,135 @@ function render() {
 
 function emptyState(text) {
   return `<div class="item"><p class="muted">${text}</p></div>`;
+}
+
+function agentQueueItems() {
+  const now = Date.now();
+  const reminderItems = state.reminders
+    .filter((item) => !item.done)
+    .map((item) => {
+      const due = new Date(item.time ? `${item.date}T${item.time}` : `${item.date}T23:59`).getTime();
+      return {
+        id: item.id,
+        type: "reminder",
+        title: item.title,
+        detail: `${item.category} · due ${formatDateTime(item)}`,
+        priority: due <= now + 48 * 60 * 60 * 1000 ? "high" : "medium",
+        sourceView: "reminders",
+        plannerTitle: item.title,
+        facts: reminderMessage(item)
+      };
+    });
+  const supportItems = state.supportRequests
+    .filter((item) => ["requested", "no-response"].includes(item.status))
+    .map((item) => ({
+      id: item.id,
+      type: "support",
+      title: item.reason,
+      detail: `${supportStatusLabel(item.status)} · ${formatDateTimeValue(item.start)}`,
+      priority: item.status === "no-response" ? "high" : "medium",
+      sourceView: "support",
+      plannerTitle: `Resolve childcare support: ${item.reason}`,
+      facts: supportRequestMessage(item)
+    }));
+  const homeworkItems = state.homeworkItems
+    .filter((item) => item.status !== "submitted")
+    .map((item) => ({
+      id: item.id,
+      type: "homework",
+      title: item.title,
+      detail: `${homeworkStatusLabel(item.status)} · due ${formatDateTimeValue(`${item.dueDate}T12:00`)}`,
+      priority: item.status === "needs-help" ? "high" : "medium",
+      sourceView: "school",
+      plannerTitle: `Homework follow-up: ${item.title}`,
+      facts: homeworkMessage(item)
+    }));
+  const schoolItems = state.schoolOptions
+    .filter((item) => item.stage === "decision-needed")
+    .map((item) => ({
+      id: item.id,
+      type: "school",
+      title: item.name,
+      detail: `Decision needed${item.deadline ? ` · deadline ${formatDateTimeValue(`${item.deadline}T12:00`)}` : ""}`,
+      priority: "high",
+      sourceView: "school",
+      plannerTitle: `School decision: ${item.name}`,
+      facts: schoolDecisionMessage(item)
+    }));
+  const chatItems = state.chatMessages
+    .filter((item) => /(school|homework|pickup|doctor|therapy|expense|reimburse|schedule|calendar|support)/i.test(item.text))
+    .slice(0, 5)
+    .map((item) => ({
+      id: item.id,
+      type: "chat",
+      title: `${chatCategoryLabel(item.category)} message from ${item.sender}`,
+      detail: new Date(item.timestamp).toLocaleString(),
+      priority: "low",
+      sourceView: "whatsapp",
+      plannerTitle: `Review WhatsApp: ${chatCategoryLabel(item.category)}`,
+      facts: `${item.sender} wrote on ${new Date(item.timestamp).toLocaleString()}:\n${item.text}`
+    }));
+  const priorityWeight = { high: 0, medium: 1, low: 2 };
+  return [...supportItems, ...homeworkItems, ...schoolItems, ...reminderItems, ...chatItems]
+    .sort((a, b) => priorityWeight[a.priority] - priorityWeight[b.priority])
+    .slice(0, 12);
+}
+
+function agentItemTemplate(item) {
+  return `
+    <div class="item agent-item ${item.priority}" data-agent-id="${item.id}" data-agent-type="${item.type}">
+      <div class="item-header">
+        <div>
+          <p class="item-title">${escapeHtml(item.title)}</p>
+          <p class="item-meta">${escapeHtml(item.detail)}</p>
+        </div>
+        <span class="pill ${item.priority === "high" ? "warn" : item.priority === "low" ? "good" : ""}">${item.priority}</span>
+      </div>
+      <div class="item-actions">
+        <button class="primary" type="button" data-action="agent-plan-item" data-agent-type="${item.type}" data-id="${item.id}"><i data-lucide="calendar-plus"></i><span>Plan</span></button>
+        <button class="secondary" type="button" data-action="agent-draft-item" data-agent-type="${item.type}" data-id="${item.id}"><i data-lucide="wand-2"></i><span>Draft</span></button>
+        <button class="ghost" type="button" data-action="agent-open-item" data-view="${item.sourceView}">Open</button>
+      </div>
+    </div>
+  `;
+}
+
+function renderAgentDesk() {
+  const queue = agentQueueItems();
+  const high = queue.filter((item) => item.priority === "high").length;
+  const openPlannerTasks = Object.values(state.dailyPlans || {}).flatMap((plan) => plan.tasks || []).filter((task) => !task.done).length;
+  $("#agentRiskLevel").textContent = high ? `${high} urgent` : queue.length ? "Active" : "Clear";
+  $("#agentRiskLevel").className = `pill ${high ? "warn" : "good"}`;
+  $("#agentQueueCount").textContent = `${queue.length} item${queue.length === 1 ? "" : "s"}`;
+  $("#agentBriefing").innerHTML = [
+    `${queue.length} managed item${queue.length === 1 ? "" : "s"} need review across reminders, support, school, homework, and messages.`,
+    `${openPlannerTasks} open planner task${openPlannerTasks === 1 ? "" : "s"} exist across daily sheets.`,
+    high ? "Handle urgent items first, then draft only the messages that need a written record." : "No urgent queue items. Use intake to capture new work as it appears."
+  ].map((line) => `<p class="briefing-line">${escapeHtml(line)}</p>`).join("");
+  $("#agentQueue").innerHTML = queue.length
+    ? queue.map(agentItemTemplate).join("")
+    : emptyState("No active items. Capture a new issue or import WhatsApp messages.");
+}
+
+function findAgentItem(type, id) {
+  return agentQueueItems().find((item) => item.type === type && item.id === id);
+}
+
+function addPlannerTaskFromAgent(item) {
+  const plan = getPlan();
+  const title = item.plannerTitle || item.title;
+  if (plan.tasks.some((task) => task.title === title && !task.done)) return false;
+  plan.tasks.push({
+    id: crypto.randomUUID(),
+    title,
+    category: item.type === "chat" ? "Message" : item.type.charAt(0).toUpperCase() + item.type.slice(1),
+    estimate: item.priority === "high" ? 3 : 2,
+    actual: 0,
+    done: false,
+    createdAt: new Date().toISOString()
+  });
+  saveState();
+  return true;
 }
 
 function plannerHours() {
@@ -652,6 +782,40 @@ function bindEvents() {
     button.addEventListener("click", () => switchView(button.dataset.jump));
   });
 
+  $("#agentIntakeForm").addEventListener("submit", (event) => {
+    event.preventDefault();
+    const data = Object.fromEntries(new FormData(event.currentTarget));
+    const text = data.text.trim();
+    if (data.route === "message") {
+      switchView("mediator");
+      $("#messageForm").topic.value = `${data.priority} priority follow-up`;
+      $("#messageForm").facts.value = text;
+      $("#draftText").value = generateDraft({
+        topic: `${data.priority} priority follow-up`,
+        facts: text,
+        goal: "deescalate",
+        tone: data.priority === "high" ? "firm" : "brief"
+      });
+      updateDraftActions($("#draftText").value);
+      showToast("Draft prepared");
+    } else {
+      const plan = getPlan();
+      plan.tasks.push({
+        id: crypto.randomUUID(),
+        title: text,
+        category: data.route === "planner" ? "Message" : data.route.charAt(0).toUpperCase() + data.route.slice(1),
+        estimate: data.priority === "high" ? 3 : 2,
+        actual: 0,
+        done: false,
+        createdAt: new Date().toISOString()
+      });
+      saveState();
+      render();
+      showToast("Issue routed to planner");
+    }
+    event.currentTarget.reset();
+  });
+
   $("#plannerDate").addEventListener("change", (event) => {
     state.selectedPlanDate = event.target.value || new Date().toISOString().slice(0, 10);
     getPlan(state.selectedPlanDate);
@@ -875,6 +1039,38 @@ function bindEvents() {
       saveState();
       render();
       showToast("Interruption deleted");
+    }
+    if (action === "agent-build-plan") {
+      const queue = agentQueueItems().slice(0, 5);
+      const added = queue.filter(addPlannerTaskFromAgent).length;
+      render();
+      switchView("planner");
+      showToast(`Added ${added} item${added === 1 ? "" : "s"} to today's plan`);
+    }
+    if (action === "agent-plan-item") {
+      const item = findAgentItem(button.dataset.agentType, id);
+      if (!item) return;
+      const added = addPlannerTaskFromAgent(item);
+      render();
+      showToast(added ? "Added to today's plan" : "Already in today's plan");
+    }
+    if (action === "agent-draft-item") {
+      const item = findAgentItem(button.dataset.agentType, id);
+      if (!item) return;
+      switchView("mediator");
+      $("#messageForm").topic.value = item.title;
+      $("#messageForm").facts.value = item.facts;
+      $("#draftText").value = generateDraft({
+        topic: item.title,
+        facts: item.facts,
+        goal: item.priority === "high" ? "request" : "confirm",
+        tone: item.priority === "high" ? "firm" : "brief"
+      });
+      updateDraftActions($("#draftText").value);
+      showToast("Draft prepared");
+    }
+    if (action === "agent-open-item") {
+      switchView(button.dataset.view);
     }
     if (action === "toggle-reminder") {
       const reminder = state.reminders.find((item) => item.id === id);

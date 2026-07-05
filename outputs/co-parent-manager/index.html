@@ -28,7 +28,10 @@
 
     <main class="layout">
       <nav class="sidebar" aria-label="Main navigation">
-        <button class="nav-item is-active" type="button" data-view="planner">
+        <button class="nav-item is-active" type="button" data-view="agent">
+          <i data-lucide="bot"></i><span>Agent Desk</span>
+        </button>
+        <button class="nav-item" type="button" data-view="planner">
           <i data-lucide="clipboard-list"></i><span>Planner</span>
         </button>
         <button class="nav-item" type="button" data-view="dashboard">
@@ -58,7 +61,85 @@
       </nav>
 
       <section class="content">
-        <section class="view is-active" id="planner">
+        <section class="view is-active" id="agent">
+          <div class="section-heading">
+            <div>
+              <p class="eyebrow">Manager mode</p>
+              <h2>Co-parenting agent desk</h2>
+            </div>
+            <button class="primary" type="button" data-action="agent-build-plan">
+              <i data-lucide="sparkles"></i><span>Build today's plan</span>
+            </button>
+          </div>
+
+          <div class="agent-grid">
+            <section class="agent-main">
+              <article class="panel">
+                <div class="panel-title">
+                  <h3>Agent briefing</h3>
+                  <span class="pill" id="agentRiskLevel">Standing by</span>
+                </div>
+                <div id="agentBriefing" class="briefing"></div>
+              </article>
+
+              <article class="panel">
+                <div class="panel-title">
+                  <h3>Next best actions</h3>
+                  <span class="pill" id="agentQueueCount">0 items</span>
+                </div>
+                <div id="agentQueue" class="stack"></div>
+              </article>
+            </section>
+
+            <aside class="agent-side">
+              <form class="panel form" id="agentIntakeForm">
+                <h3>Route a new issue</h3>
+                <label>
+                  <span>What needs managing?</span>
+                  <textarea name="text" rows="5" required placeholder="Paste a message, describe a request, or write the situation that needs a next step."></textarea>
+                </label>
+                <div class="two-col">
+                  <label>
+                    <span>Route</span>
+                    <select name="route">
+                      <option value="planner">Planner task</option>
+                      <option value="message">Draft message</option>
+                      <option value="support">Childcare support</option>
+                      <option value="homework">Homework follow-up</option>
+                      <option value="school">School decision</option>
+                      <option value="reminder">Reminder</option>
+                    </select>
+                  </label>
+                  <label>
+                    <span>Priority</span>
+                    <select name="priority">
+                      <option value="high">High</option>
+                      <option value="medium">Medium</option>
+                      <option value="low">Low</option>
+                    </select>
+                  </label>
+                </div>
+                <button class="primary" type="submit">
+                  <i data-lucide="route"></i><span>Route issue</span>
+                </button>
+              </form>
+
+              <article class="panel">
+                <div class="panel-title">
+                  <h3>Operating rules</h3>
+                </div>
+                <div class="rule-list">
+                  <p>Separate facts from emotion.</p>
+                  <p>Turn every issue into a next action.</p>
+                  <p>Use WhatsApp for concise confirmations.</p>
+                  <p>Keep private records local.</p>
+                </div>
+              </article>
+            </aside>
+          </div>
+        </section>
+
+        <section class="view" id="planner">
           <div class="section-heading">
             <div>
               <p class="eyebrow">Daily sheet</p>

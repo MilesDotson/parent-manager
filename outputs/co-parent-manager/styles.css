@@ -267,6 +267,54 @@ h3 {
   grid-template-columns: minmax(0, 1.35fr) minmax(280px, 0.65fr);
 }
 
+.agent-grid {
+  align-items: start;
+  display: grid;
+  gap: 18px;
+  grid-template-columns: minmax(0, 1.4fr) minmax(300px, 0.6fr);
+}
+
+.agent-main,
+.agent-side {
+  display: grid;
+  gap: 18px;
+}
+
+.agent-side {
+  position: sticky;
+  top: 108px;
+}
+
+.briefing {
+  display: grid;
+  gap: 10px;
+}
+
+.briefing-line,
+.rule-list p {
+  background: #fbfcfb;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  margin: 0;
+  padding: 11px 12px;
+}
+
+.agent-item {
+  border-left: 5px solid var(--blue);
+}
+
+.agent-item.high {
+  border-left-color: var(--red);
+}
+
+.agent-item.medium {
+  border-left-color: var(--amber);
+}
+
+.agent-item.low {
+  border-left-color: var(--green);
+}
+
 .planner-main {
   display: grid;
   gap: 18px;
@@ -480,11 +528,13 @@ svg {
   .layout,
   .dashboard-grid,
   .split,
+  .agent-grid,
   .planner-sheet,
   .metric-grid {
     grid-template-columns: 1fr;
   }
 
+  .agent-side,
   .planner-side {
     position: static;
   }
