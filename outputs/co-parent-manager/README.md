@@ -5,6 +5,7 @@ A free, local-first co-parenting manager and agent. It turns reminders, childcar
 ## What it does
 
 - Gives you an Agent Desk that briefs you, prioritizes open issues, drafts next messages, and routes work into today's plan.
+- Practices meticulousness with evidence/date/next-action checks and a pre-send message checklist.
 - Includes a daily planning sheet for co-parenting priorities, time blocks, interruptions, and carry-forward notes.
 - Saves reminders for exchanges, school, medical items, expenses, and schedule changes.
 - Logs childcare support requests when coverage is needed during the other parent's parenting time.

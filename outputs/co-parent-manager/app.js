@@ -263,6 +263,60 @@ function agentQueueItems() {
     .slice(0, 12);
 }
 
+function itemHasDate(item) {
+  return /\b(due|deadline|at|on)\b/i.test(item.detail || "") || /\d{1,2}\/\d{1,2}|\d{4}-\d{2}-\d{2}|AM|PM/i.test(`${item.detail} ${item.facts}`);
+}
+
+function itemHasEvidence(item) {
+  return /(whatsapp|message|school|portal|email|calendar|receipt|doctor|therapy|homework|form|source|wrote)/i.test(`${item.detail} ${item.facts}`);
+}
+
+function itemHasNextAction(item) {
+  return /(confirm|reply|review|resolve|request|check|send|support|decision|follow-up|follow up)/i.test(`${item.title} ${item.plannerTitle} ${item.facts}`);
+}
+
+function meticulousCheckRows(queue) {
+  const total = Math.max(queue.length, 1);
+  const dated = queue.filter(itemHasDate).length;
+  const evidenced = queue.filter(itemHasEvidence).length;
+  const actionable = queue.filter(itemHasNextAction).length;
+  const planned = Object.values(state.dailyPlans || {}).flatMap((plan) => plan.tasks || []).filter((task) => !task.done).length;
+  return [
+    {
+      title: "Dates are attached",
+      detail: `${dated}/${queue.length} active items include a date, time, or deadline.`,
+      pass: queue.length === 0 || dated / total >= 0.75
+    },
+    {
+      title: "Evidence is named",
+      detail: `${evidenced}/${queue.length} active items refer to a source such as WhatsApp, school, calendar, receipt, or form.`,
+      pass: queue.length === 0 || evidenced / total >= 0.75
+    },
+    {
+      title: "Next action is clear",
+      detail: `${actionable}/${queue.length} active items contain a concrete next action.`,
+      pass: queue.length === 0 || actionable / total >= 0.75
+    },
+    {
+      title: "Work is planned",
+      detail: `${planned} open task${planned === 1 ? "" : "s"} currently exist in daily plans.`,
+      pass: planned > 0 || queue.length === 0
+    }
+  ];
+}
+
+function checklistTemplate(rows) {
+  return rows.map((row) => `
+    <div class="check-row ${row.pass ? "pass" : ""}">
+      <span class="check-mark">${row.pass ? "✓" : "!"}</span>
+      <div>
+        <strong>${escapeHtml(row.title)}</strong>
+        <span>${escapeHtml(row.detail)}</span>
+      </div>
+    </div>
+  `).join("");
+}
+
 function agentItemTemplate(item) {
   return `
     <div class="item agent-item ${item.priority}" data-agent-id="${item.id}" data-agent-type="${item.type}">
@@ -286,9 +340,14 @@ function renderAgentDesk() {
   const queue = agentQueueItems();
   const high = queue.filter((item) => item.priority === "high").length;
   const openPlannerTasks = Object.values(state.dailyPlans || {}).flatMap((plan) => plan.tasks || []).filter((task) => !task.done).length;
+  const checks = meticulousCheckRows(queue);
+  const score = Math.round((checks.filter((row) => row.pass).length / checks.length) * 100);
   $("#agentRiskLevel").textContent = high ? `${high} urgent` : queue.length ? "Active" : "Clear";
   $("#agentRiskLevel").className = `pill ${high ? "warn" : "good"}`;
   $("#agentQueueCount").textContent = `${queue.length} item${queue.length === 1 ? "" : "s"}`;
+  $("#meticulousScore").textContent = `${score}%`;
+  $("#meticulousScore").className = `pill ${score >= 75 ? "good" : "warn"}`;
+  $("#meticulousChecks").innerHTML = checklistTemplate(checks);
   $("#agentBriefing").innerHTML = [
     `${queue.length} managed item${queue.length === 1 ? "" : "s"} need review across reminders, support, school, homework, and messages.`,
     `${openPlannerTasks} open planner task${openPlannerTasks === 1 ? "" : "s"} exist across daily sheets.`,
@@ -318,6 +377,32 @@ function addPlannerTaskFromAgent(item) {
   });
   saveState();
   return true;
+}
+
+function draftChecks(text) {
+  const trimmed = text.trim();
+  return [
+    {
+      title: "States the purpose",
+      detail: "The message should make the requested outcome obvious.",
+      pass: /(confirm|request|asking|documenting|review|reply|plan|decision)/i.test(trimmed)
+    },
+    {
+      title: "Uses facts, not accusations",
+      detail: "Avoid always, never, fault, ridiculous, and similar escalation words.",
+      pass: trimmed.length > 0 && chargedWordCount(trimmed) === 0
+    },
+    {
+      title: "Includes a response path",
+      detail: "Ask for confirmation, an alternative, or a specific reply.",
+      pass: /(confirm|reply|please|alternative|what works|can you)/i.test(trimmed)
+    },
+    {
+      title: "Concise enough to send",
+      detail: "Keep the draft under 180 words unless documenting a complex issue.",
+      pass: trimmed.split(/\s+/).filter(Boolean).length <= 180
+    }
+  ];
 }
 
 function plannerHours() {
@@ -719,6 +804,12 @@ function dedupeChatMessages(messages) {
   });
 }
 
+function mergeById(existing = [], incoming = []) {
+  const items = new Map(existing.map((item) => [item.id, item]));
+  incoming.forEach((item) => items.set(item.id, item));
+  return [...items.values()];
+}
+
 function messageItemTemplate(item) {
   return `
     <div class="item">
@@ -786,13 +877,16 @@ function bindEvents() {
     event.preventDefault();
     const data = Object.fromEntries(new FormData(event.currentTarget));
     const text = data.text.trim();
+    const evidenceLine = data.evidence?.trim() ? `\nEvidence/source: ${data.evidence.trim()}` : "";
+    const neededLine = data.neededBy ? `\nNeeded by: ${formatDateTimeValue(data.neededBy)}` : "";
+    const routedText = `${text}${evidenceLine}${neededLine}`;
     if (data.route === "message") {
       switchView("mediator");
       $("#messageForm").topic.value = `${data.priority} priority follow-up`;
-      $("#messageForm").facts.value = text;
+      $("#messageForm").facts.value = routedText;
       $("#draftText").value = generateDraft({
         topic: `${data.priority} priority follow-up`,
-        facts: text,
+        facts: routedText,
         goal: "deescalate",
         tone: data.priority === "high" ? "firm" : "brief"
       });
@@ -802,7 +896,7 @@ function bindEvents() {
       const plan = getPlan();
       plan.tasks.push({
         id: crypto.randomUUID(),
-        title: text,
+        title: routedText,
         category: data.route === "planner" ? "Message" : data.route.charAt(0).toUpperCase() + data.route.slice(1),
         estimate: data.priority === "high" ? 3 : 2,
         actual: 0,
@@ -1258,6 +1352,7 @@ function bindEvents() {
       const imported = JSON.parse(await file.text());
       const isProfileOnly = imported.settings && !["reminders", "agreements", "supportRequests", "schoolOptions", "homeworkItems", "messages"].some((key) => key in imported);
       const isChatArchiveOnly = Array.isArray(imported.chatMessages) && Object.keys(imported).every((key) => key === "chatMessages");
+      const isMergeImport = imported.merge === true;
       if (isProfileOnly) {
         state = {
           ...state,
@@ -1272,6 +1367,27 @@ function bindEvents() {
           chatMessages: dedupeChatMessages([...state.chatMessages, ...imported.chatMessages])
             .sort((a, b) => b.timestamp.localeCompare(a.timestamp))
         };
+      } else if (isMergeImport) {
+        state = {
+          ...state,
+          settings: {
+            ...state.settings,
+            ...imported.settings
+          },
+          reminders: mergeById(state.reminders, imported.reminders),
+          agreements: mergeById(state.agreements, imported.agreements),
+          supportRequests: mergeById(state.supportRequests, imported.supportRequests),
+          schoolOptions: mergeById(state.schoolOptions, imported.schoolOptions),
+          homeworkItems: mergeById(state.homeworkItems, imported.homeworkItems),
+          messages: mergeById(state.messages, imported.messages),
+          chatMessages: dedupeChatMessages([...state.chatMessages, ...(imported.chatMessages || [])])
+            .sort((a, b) => b.timestamp.localeCompare(a.timestamp)),
+          dailyPlans: {
+            ...state.dailyPlans,
+            ...imported.dailyPlans
+          },
+          selectedPlanDate: imported.selectedPlanDate || state.selectedPlanDate
+        };
       } else {
         state = {
           ...structuredClone(defaultState),
@@ -1284,7 +1400,7 @@ function bindEvents() {
       }
       saveState();
       render();
-      showToast(isProfileOnly ? "Profile imported" : isChatArchiveOnly ? "Chat archive imported" : "Data imported");
+      showToast(isProfileOnly ? "Profile imported" : isChatArchiveOnly ? "Chat archive imported" : isMergeImport ? "Data merged" : "Data imported");
     } catch {
       showToast("Import failed");
     } finally {
@@ -1306,6 +1422,7 @@ function updateDraftActions(text) {
   const score = $("#toneScore");
   score.textContent = !trimmed ? "No draft" : count ? `${count} tone flag${count === 1 ? "" : "s"}` : "Neutral";
   score.className = `pill ${trimmed && !count ? "good" : count ? "warn" : ""}`;
+  $("#draftChecklist").innerHTML = checklistTemplate(draftChecks(trimmed));
 }
 
 function checkDueReminders() {

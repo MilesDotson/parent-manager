@@ -84,6 +84,14 @@
 
               <article class="panel">
                 <div class="panel-title">
+                  <h3>Meticulousness checks</h3>
+                  <span class="pill" id="meticulousScore">0%</span>
+                </div>
+                <div id="meticulousChecks" class="checklist"></div>
+              </article>
+
+              <article class="panel">
+                <div class="panel-title">
                   <h3>Next best actions</h3>
                   <span class="pill" id="agentQueueCount">0 items</span>
                 </div>
@@ -97,6 +105,14 @@
                 <label>
                   <span>What needs managing?</span>
                   <textarea name="text" rows="5" required placeholder="Paste a message, describe a request, or write the situation that needs a next step."></textarea>
+                </label>
+                <label>
+                  <span>Evidence or source</span>
+                  <input name="evidence" placeholder="WhatsApp, school portal, email, calendar, receipt, call notes" />
+                </label>
+                <label>
+                  <span>Needed by</span>
+                  <input name="neededBy" type="datetime-local" />
                 </label>
                 <div class="two-col">
                   <label>
@@ -129,10 +145,10 @@
                   <h3>Operating rules</h3>
                 </div>
                 <div class="rule-list">
-                  <p>Separate facts from emotion.</p>
-                  <p>Turn every issue into a next action.</p>
-                  <p>Use WhatsApp for concise confirmations.</p>
-                  <p>Keep private records local.</p>
+                  <p>Write the date, source, and requested outcome.</p>
+                  <p>Separate verified facts from assumptions.</p>
+                  <p>Turn every issue into one observable next action.</p>
+                  <p>Review the pre-send checklist before WhatsApp.</p>
                 </div>
               </article>
             </aside>
@@ -683,6 +699,7 @@
                 <h3>Draft</h3>
                 <span id="toneScore" class="pill">No draft</span>
               </div>
+              <div id="draftChecklist" class="checklist compact-checklist"></div>
               <textarea id="draftText" rows="11" placeholder="Your neutral draft will appear here."></textarea>
               <div class="button-row">
                 <button class="secondary" id="copyDraft" type="button">
