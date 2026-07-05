@@ -28,6 +28,7 @@ const defaultState = {
       createdAt: new Date().toISOString()
     }
   ],
+  supportRequests: [],
   messages: []
 };
 
@@ -82,14 +83,37 @@ function formatDateTime(item) {
   }).format(new Date(date));
 }
 
+function formatDateTimeValue(value) {
+  if (!value) return "Not set";
+  return new Intl.DateTimeFormat(undefined, {
+    dateStyle: "medium",
+    timeStyle: "short"
+  }).format(new Date(value));
+}
+
 function sortByDueDate(items) {
   return [...items].sort((a, b) => `${a.date} ${a.time || ""}`.localeCompare(`${b.date} ${b.time || ""}`));
+}
+
+function sortByStart(items) {
+  return [...items].sort((a, b) => (a.start || "").localeCompare(b.start || ""));
 }
 
 function reminderMessage(reminder) {
   const childText = reminder.child ? ` for ${reminder.child}` : "";
   const details = reminder.details ? `\n\nDetails: ${reminder.details}` : "";
   return `Hi${state.settings.coparentName ? ` ${state.settings.coparentName}` : ""}, quick reminder${childText}: ${reminder.title} is set for ${formatDateTime(reminder)}.${details}\n\nCan you please confirm when you have a chance?`;
+}
+
+function supportRequestMessage(request) {
+  const childText = request.child ? ` for ${request.child}` : "";
+  const endText = request.end ? ` until ${formatDateTimeValue(request.end)}` : "";
+  const context = {
+    other: "during your scheduled parenting time",
+    mine: "during my scheduled parenting time",
+    shared: "during a shared or unclear schedule window"
+  }[request.parentingTime] || "during the schedule window";
+  return `Hi${state.settings.coparentName ? ` ${state.settings.coparentName}` : ""}, I need to request childcare support${childText} ${context}.\n\nTime: ${formatDateTimeValue(request.start)}${endText}\nReason: ${request.reason}\nRequest: ${request.request}\n\nCan you please confirm whether you can help?`;
 }
 
 function whatsappUrl(text) {
@@ -130,6 +154,7 @@ function generateDraft({ topic, facts, goal, tone }) {
 function render() {
   renderDashboard();
   renderReminders();
+  renderSupportRequests();
   renderMessages();
   renderAgreements();
   renderSettings();
@@ -142,6 +167,7 @@ function emptyState(text) {
 
 function renderDashboard() {
   const openReminders = state.reminders.filter((item) => !item.done);
+  const openSupportRequests = state.supportRequests.filter((item) => ["requested", "no-response"].includes(item.status));
   const now = Date.now();
   const soon = openReminders.filter((item) => {
     const due = new Date(item.time ? `${item.date}T${item.time}` : `${item.date}T23:59`).getTime();
@@ -149,8 +175,8 @@ function renderDashboard() {
   });
   $("#openReminderCount").textContent = openReminders.length;
   $("#dueSoonCount").textContent = soon.length;
+  $("#openSupportCount").textContent = openSupportRequests.length;
   $("#agreementCount").textContent = state.agreements.length;
-  $("#messageCount").textContent = state.messages.length;
 
   const upcoming = sortByDueDate(openReminders).slice(0, 5);
   $("#upcomingList").innerHTML = upcoming.length
@@ -160,6 +186,10 @@ function renderDashboard() {
   $("#recentMessages").innerHTML = state.messages.slice(0, 5).length
     ? state.messages.slice(0, 5).map(messageItemTemplate).join("")
     : emptyState("No messages logged yet.");
+
+  $("#recentSupportRequests").innerHTML = state.supportRequests.slice(0, 5).length
+    ? state.supportRequests.slice(0, 5).map(supportItemTemplate).join("")
+    : emptyState("No childcare support requests logged.");
 }
 
 function reminderItemTemplate(item) {
@@ -193,6 +223,52 @@ function renderReminders() {
   $("#reminderList").innerHTML = filtered.length
     ? filtered.map(reminderItemTemplate).join("")
     : emptyState("No reminders match this filter.");
+}
+
+function supportStatusLabel(status) {
+  return {
+    requested: "Requested",
+    accepted: "Accepted",
+    declined: "Declined",
+    "no-response": "No response",
+    resolved: "Resolved"
+  }[status] || "Requested";
+}
+
+function supportItemTemplate(item) {
+  const statusClass = item.status === "accepted" || item.status === "resolved" ? "good" : item.status === "declined" || item.status === "no-response" ? "warn" : "";
+  const endText = item.end ? ` to ${formatDateTimeValue(item.end)}` : "";
+  return `
+    <div class="item" data-support-id="${item.id}">
+      <div class="item-header">
+        <div>
+          <p class="item-title">${escapeHtml(item.reason)}</p>
+          <p class="item-meta">${formatDateTimeValue(item.start)}${endText}${item.child ? ` · ${escapeHtml(item.child)}` : ""}</p>
+        </div>
+        <span class="pill ${statusClass}">${supportStatusLabel(item.status)}</span>
+      </div>
+      <p>${escapeHtml(item.request)}</p>
+      ${item.response ? `<p class="item-meta">Response: ${escapeHtml(item.response)}</p>` : ""}
+      <div class="item-actions">
+        <button class="secondary" type="button" data-action="send-support" data-id="${item.id}"><i data-lucide="send"></i><span>WhatsApp</span></button>
+        <button class="ghost" type="button" data-action="support-accepted" data-id="${item.id}">Accepted</button>
+        <button class="ghost" type="button" data-action="support-no-response" data-id="${item.id}">No response</button>
+        <button class="ghost danger" type="button" data-action="delete-support" data-id="${item.id}">Delete</button>
+      </div>
+    </div>
+  `;
+}
+
+function renderSupportRequests() {
+  const filter = $("#supportFilter").value;
+  const filtered = sortByStart(state.supportRequests).filter((item) => {
+    if (filter === "open") return ["requested", "no-response"].includes(item.status);
+    if (filter === "all") return true;
+    return item.status === filter;
+  });
+  $("#supportList").innerHTML = filtered.length
+    ? filtered.map(supportItemTemplate).join("")
+    : emptyState("No support requests match this filter.");
 }
 
 function messageItemTemplate(item) {
@@ -281,6 +357,31 @@ function bindEvents() {
   $("#clearReminderForm").addEventListener("click", () => $("#reminderForm").reset());
   $("#reminderFilter").addEventListener("change", renderReminders);
 
+  $("#supportForm").addEventListener("submit", (event) => {
+    event.preventDefault();
+    const data = Object.fromEntries(new FormData(event.currentTarget));
+    state.supportRequests.unshift({
+      id: crypto.randomUUID(),
+      reason: data.reason.trim(),
+      child: data.child.trim(),
+      parentingTime: data.parentingTime,
+      start: data.start,
+      end: data.end,
+      request: data.request.trim(),
+      response: data.response.trim(),
+      status: data.status,
+      requestedAt: data.requestedAt || new Date().toISOString().slice(0, 16),
+      createdAt: new Date().toISOString()
+    });
+    saveState();
+    event.currentTarget.reset();
+    render();
+    showToast("Support request saved");
+  });
+
+  $("#clearSupportForm").addEventListener("click", () => $("#supportForm").reset());
+  $("#supportFilter").addEventListener("change", renderSupportRequests);
+
   document.addEventListener("click", (event) => {
     const button = event.target.closest("[data-action]");
     if (!button) return;
@@ -300,6 +401,28 @@ function bindEvents() {
     if (action === "send-reminder") {
       const reminder = state.reminders.find((item) => item.id === id);
       window.open(whatsappUrl(reminderMessage(reminder)), "_blank", "noreferrer");
+    }
+    if (action === "send-support") {
+      const request = state.supportRequests.find((item) => item.id === id);
+      window.open(whatsappUrl(supportRequestMessage(request)), "_blank", "noreferrer");
+    }
+    if (action === "support-accepted") {
+      const request = state.supportRequests.find((item) => item.id === id);
+      request.status = "accepted";
+      saveState();
+      render();
+    }
+    if (action === "support-no-response") {
+      const request = state.supportRequests.find((item) => item.id === id);
+      request.status = "no-response";
+      saveState();
+      render();
+    }
+    if (action === "delete-support") {
+      state.supportRequests = state.supportRequests.filter((item) => item.id !== id);
+      saveState();
+      render();
+      showToast("Support request deleted");
     }
     if (action === "delete-agreement") {
       state.agreements = state.agreements.filter((item) => item.id !== id);

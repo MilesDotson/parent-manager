@@ -33,6 +33,9 @@
         <button class="nav-item" type="button" data-view="reminders">
           <i data-lucide="bell-ring"></i><span>Reminders</span>
         </button>
+        <button class="nav-item" type="button" data-view="support">
+          <i data-lucide="hand-heart"></i><span>Support Log</span>
+        </button>
         <button class="nav-item" type="button" data-view="mediator">
           <i data-lucide="messages-square"></i><span>Mediator</span>
         </button>
@@ -66,12 +69,12 @@
               <p>Due in 48 hours</p>
             </article>
             <article class="metric">
-              <span id="agreementCount">0</span>
-              <p>Active agreements</p>
+              <span id="openSupportCount">0</span>
+              <p>Open support requests</p>
             </article>
             <article class="metric">
-              <span id="messageCount">0</span>
-              <p>Messages logged</p>
+              <span id="agreementCount">0</span>
+              <p>Active agreements</p>
             </article>
           </div>
 
@@ -90,6 +93,14 @@
                 <button class="ghost" type="button" data-jump="mediator">Draft</button>
               </div>
               <div id="recentMessages" class="stack"></div>
+            </article>
+
+            <article class="panel">
+              <div class="panel-title">
+                <h3>Childcare support requests</h3>
+                <button class="ghost" type="button" data-jump="support">View log</button>
+              </div>
+              <div id="recentSupportRequests" class="stack"></div>
             </article>
           </div>
         </section>
@@ -161,6 +172,93 @@
                 </select>
               </div>
               <div id="reminderList" class="stack"></div>
+            </article>
+          </div>
+        </section>
+
+        <section class="view" id="support">
+          <div class="section-heading">
+            <div>
+              <p class="eyebrow">Opposite-parent time</p>
+              <h2>Childcare support request log</h2>
+            </div>
+          </div>
+
+          <div class="split">
+            <form class="panel form" id="supportForm">
+              <h3>Log support request</h3>
+              <label>
+                <span>Reason childcare is needed</span>
+                <input name="reason" required placeholder="Work meeting, medical appointment, travel delay" />
+              </label>
+              <div class="two-col">
+                <label>
+                  <span>Child</span>
+                  <input name="child" placeholder="Child name" />
+                </label>
+                <label>
+                  <span>Parenting time</span>
+                  <select name="parentingTime">
+                    <option value="other">Other parent's scheduled time</option>
+                    <option value="mine">My scheduled time</option>
+                    <option value="shared">Shared or unclear</option>
+                  </select>
+                </label>
+              </div>
+              <div class="two-col">
+                <label>
+                  <span>Start</span>
+                  <input name="start" type="datetime-local" required />
+                </label>
+                <label>
+                  <span>End</span>
+                  <input name="end" type="datetime-local" />
+                </label>
+              </div>
+              <label>
+                <span>Support requested</span>
+                <textarea name="request" rows="4" required placeholder="What help are you asking for? Include pickup, drop-off, location, or coverage needed."></textarea>
+              </label>
+              <label>
+                <span>Response notes</span>
+                <textarea name="response" rows="3" placeholder="Accepted, declined, no response, alternate plan, or follow-up notes."></textarea>
+              </label>
+              <div class="two-col">
+                <label>
+                  <span>Status</span>
+                  <select name="status">
+                    <option value="requested">Requested</option>
+                    <option value="accepted">Accepted</option>
+                    <option value="declined">Declined</option>
+                    <option value="no-response">No response</option>
+                    <option value="resolved">Resolved another way</option>
+                  </select>
+                </label>
+                <label>
+                  <span>Requested on</span>
+                  <input name="requestedAt" type="datetime-local" />
+                </label>
+              </div>
+              <div class="button-row">
+                <button class="primary" type="submit">
+                  <i data-lucide="save"></i><span>Save request</span>
+                </button>
+                <button class="ghost" id="clearSupportForm" type="button">Clear</button>
+              </div>
+            </form>
+
+            <article class="panel">
+              <div class="panel-title">
+                <h3>Request history</h3>
+                <select id="supportFilter" aria-label="Filter support requests">
+                  <option value="open">Open</option>
+                  <option value="all">All</option>
+                  <option value="accepted">Accepted</option>
+                  <option value="declined">Declined</option>
+                  <option value="no-response">No response</option>
+                </select>
+              </div>
+              <div id="supportList" class="stack"></div>
             </article>
           </div>
         </section>
