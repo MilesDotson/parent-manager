@@ -240,6 +240,10 @@ h3 {
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
 }
 
+.section-spacer {
+  margin-top: 18px;
+}
+
 .panel {
   padding: 18px;
 }

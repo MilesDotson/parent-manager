@@ -6,6 +6,8 @@ A free, local-first co-parenting dashboard inspired by tools like MyFamilyWizard
 
 - Saves reminders for exchanges, school, medical items, expenses, and schedule changes.
 - Logs childcare support requests when coverage is needed during the other parent's parenting time.
+- Tracks school options, application stages, deadlines, and school-choice decisions.
+- Monitors homework assignments, due dates, status, and parent follow-up.
 - Generates neutral co-parenting message drafts from plain facts.
 - Opens WhatsApp with the message text ready to send.
 - Stores a co-parent profile locally in your browser.

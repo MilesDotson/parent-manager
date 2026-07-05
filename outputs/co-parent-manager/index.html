@@ -36,6 +36,9 @@
         <button class="nav-item" type="button" data-view="support">
           <i data-lucide="hand-heart"></i><span>Support Log</span>
         </button>
+        <button class="nav-item" type="button" data-view="school">
+          <i data-lucide="graduation-cap"></i><span>School</span>
+        </button>
         <button class="nav-item" type="button" data-view="mediator">
           <i data-lucide="messages-square"></i><span>Mediator</span>
         </button>
@@ -73,8 +76,12 @@
               <p>Open support requests</p>
             </article>
             <article class="metric">
-              <span id="agreementCount">0</span>
-              <p>Active agreements</p>
+              <span id="openHomeworkCount">0</span>
+              <p>Open homework</p>
+            </article>
+            <article class="metric">
+              <span id="schoolDecisionCount">0</span>
+              <p>School decisions</p>
             </article>
           </div>
 
@@ -101,6 +108,14 @@
                 <button class="ghost" type="button" data-jump="support">View log</button>
               </div>
               <div id="recentSupportRequests" class="stack"></div>
+            </article>
+
+            <article class="panel">
+              <div class="panel-title">
+                <h3>School and homework</h3>
+                <button class="ghost" type="button" data-jump="school">Review</button>
+              </div>
+              <div id="schoolDashboardList" class="stack"></div>
             </article>
           </div>
         </section>
@@ -259,6 +274,132 @@
                 </select>
               </div>
               <div id="supportList" class="stack"></div>
+            </article>
+          </div>
+        </section>
+
+        <section class="view" id="school">
+          <div class="section-heading">
+            <div>
+              <p class="eyebrow">Education</p>
+              <h2>School selection and homework monitoring</h2>
+            </div>
+          </div>
+
+          <div class="split">
+            <form class="panel form" id="schoolForm">
+              <h3>Add school option</h3>
+              <label>
+                <span>School name</span>
+                <input name="name" required placeholder="School name" />
+              </label>
+              <div class="two-col">
+                <label>
+                  <span>Child</span>
+                  <input name="child" placeholder="Child name" />
+                </label>
+                <label>
+                  <span>Stage</span>
+                  <select name="stage">
+                    <option value="researching">Researching</option>
+                    <option value="tour-scheduled">Tour scheduled</option>
+                    <option value="applied">Applied</option>
+                    <option value="accepted">Accepted</option>
+                    <option value="declined">Declined</option>
+                    <option value="decision-needed">Decision needed</option>
+                  </select>
+                </label>
+              </div>
+              <div class="two-col">
+                <label>
+                  <span>Application deadline</span>
+                  <input name="deadline" type="date" />
+                </label>
+                <label>
+                  <span>Priority</span>
+                  <select name="priority">
+                    <option value="high">High</option>
+                    <option value="medium">Medium</option>
+                    <option value="low">Low</option>
+                  </select>
+                </label>
+              </div>
+              <label>
+                <span>Evaluation notes</span>
+                <textarea name="notes" rows="4" placeholder="Academic fit, commute, cost, services, aftercare, parent concerns, next step."></textarea>
+              </label>
+              <button class="primary" type="submit">
+                <i data-lucide="save"></i><span>Save school</span>
+              </button>
+            </form>
+
+            <article class="panel">
+              <div class="panel-title">
+                <h3>School options</h3>
+                <select id="schoolFilter" aria-label="Filter school options">
+                  <option value="all">All</option>
+                  <option value="decision-needed">Decision needed</option>
+                  <option value="researching">Researching</option>
+                  <option value="applied">Applied</option>
+                  <option value="accepted">Accepted</option>
+                </select>
+              </div>
+              <div id="schoolList" class="stack"></div>
+            </article>
+          </div>
+
+          <div class="split section-spacer">
+            <form class="panel form" id="homeworkForm">
+              <h3>Add homework item</h3>
+              <label>
+                <span>Assignment</span>
+                <input name="title" required placeholder="Reading log, math packet, science project" />
+              </label>
+              <div class="two-col">
+                <label>
+                  <span>Child</span>
+                  <input name="child" placeholder="Child name" />
+                </label>
+                <label>
+                  <span>Subject</span>
+                  <input name="subject" placeholder="Math, reading, science" />
+                </label>
+              </div>
+              <div class="two-col">
+                <label>
+                  <span>Due date</span>
+                  <input name="dueDate" type="date" required />
+                </label>
+                <label>
+                  <span>Status</span>
+                  <select name="status">
+                    <option value="not-started">Not started</option>
+                    <option value="in-progress">In progress</option>
+                    <option value="needs-help">Needs help</option>
+                    <option value="submitted">Submitted</option>
+                  </select>
+                </label>
+              </div>
+              <label>
+                <span>Monitoring notes</span>
+                <textarea name="notes" rows="4" placeholder="What needs to be checked, parent follow-up needed, missing materials, or teacher notes."></textarea>
+              </label>
+              <button class="primary" type="submit">
+                <i data-lucide="save"></i><span>Save homework</span>
+              </button>
+            </form>
+
+            <article class="panel">
+              <div class="panel-title">
+                <h3>Homework monitor</h3>
+                <select id="homeworkFilter" aria-label="Filter homework">
+                  <option value="open">Open</option>
+                  <option value="all">All</option>
+                  <option value="needs-help">Needs help</option>
+                  <option value="submitted">Submitted</option>
+                </select>
+              </div>
+              <div id="homeworkList" class="stack"></div>
             </article>
           </div>
         </section>

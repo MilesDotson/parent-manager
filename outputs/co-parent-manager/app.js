@@ -29,6 +29,8 @@ const defaultState = {
     }
   ],
   supportRequests: [],
+  schoolOptions: [],
+  homeworkItems: [],
   messages: []
 };
 
@@ -99,6 +101,10 @@ function sortByStart(items) {
   return [...items].sort((a, b) => (a.start || "").localeCompare(b.start || ""));
 }
 
+function sortByDateField(items, field) {
+  return [...items].sort((a, b) => (a[field] || "").localeCompare(b[field] || ""));
+}
+
 function reminderMessage(reminder) {
   const childText = reminder.child ? ` for ${reminder.child}` : "";
   const details = reminder.details ? `\n\nDetails: ${reminder.details}` : "";
@@ -114,6 +120,18 @@ function supportRequestMessage(request) {
     shared: "during a shared or unclear schedule window"
   }[request.parentingTime] || "during the schedule window";
   return `Hi${state.settings.coparentName ? ` ${state.settings.coparentName}` : ""}, I need to request childcare support${childText} ${context}.\n\nTime: ${formatDateTimeValue(request.start)}${endText}\nReason: ${request.reason}\nRequest: ${request.request}\n\nCan you please confirm whether you can help?`;
+}
+
+function schoolDecisionMessage(option) {
+  const deadline = option.deadline ? `\nDeadline: ${formatDateTimeValue(`${option.deadline}T12:00`)}` : "";
+  const childText = option.child ? ` for ${option.child}` : "";
+  return `Hi${state.settings.coparentName ? ` ${state.settings.coparentName}` : ""}, I want us to align on the school option${childText}.\n\nSchool: ${option.name}\nStage: ${schoolStageLabel(option.stage)}\nPriority: ${option.priority}${deadline}\nNotes: ${option.notes || "No notes added yet."}\n\nCan you review and share your thoughts or concerns?`;
+}
+
+function homeworkMessage(item) {
+  const childText = item.child ? ` for ${item.child}` : "";
+  const subjectText = item.subject ? ` (${item.subject})` : "";
+  return `Hi${state.settings.coparentName ? ` ${state.settings.coparentName}` : ""}, quick homework check${childText}.\n\nAssignment: ${item.title}${subjectText}\nDue: ${formatDateTimeValue(`${item.dueDate}T12:00`)}\nStatus: ${homeworkStatusLabel(item.status)}\nNotes: ${item.notes || "No notes added yet."}\n\nCan you confirm what has been completed on your side?`;
 }
 
 function whatsappUrl(text) {
@@ -155,6 +173,8 @@ function render() {
   renderDashboard();
   renderReminders();
   renderSupportRequests();
+  renderSchoolOptions();
+  renderHomeworkItems();
   renderMessages();
   renderAgreements();
   renderSettings();
@@ -168,6 +188,8 @@ function emptyState(text) {
 function renderDashboard() {
   const openReminders = state.reminders.filter((item) => !item.done);
   const openSupportRequests = state.supportRequests.filter((item) => ["requested", "no-response"].includes(item.status));
+  const openHomework = state.homeworkItems.filter((item) => item.status !== "submitted");
+  const schoolDecisions = state.schoolOptions.filter((item) => item.stage === "decision-needed");
   const now = Date.now();
   const soon = openReminders.filter((item) => {
     const due = new Date(item.time ? `${item.date}T${item.time}` : `${item.date}T23:59`).getTime();
@@ -176,7 +198,8 @@ function renderDashboard() {
   $("#openReminderCount").textContent = openReminders.length;
   $("#dueSoonCount").textContent = soon.length;
   $("#openSupportCount").textContent = openSupportRequests.length;
-  $("#agreementCount").textContent = state.agreements.length;
+  $("#openHomeworkCount").textContent = openHomework.length;
+  $("#schoolDecisionCount").textContent = schoolDecisions.length;
 
   const upcoming = sortByDueDate(openReminders).slice(0, 5);
   $("#upcomingList").innerHTML = upcoming.length
@@ -190,6 +213,14 @@ function renderDashboard() {
   $("#recentSupportRequests").innerHTML = state.supportRequests.slice(0, 5).length
     ? state.supportRequests.slice(0, 5).map(supportItemTemplate).join("")
     : emptyState("No childcare support requests logged.");
+
+  const schoolItems = [
+    ...sortByDateField(openHomework, "dueDate").slice(0, 3).map(homeworkItemTemplate),
+    ...schoolDecisions.slice(0, 2).map(schoolItemTemplate)
+  ];
+  $("#schoolDashboardList").innerHTML = schoolItems.length
+    ? schoolItems.join("")
+    : emptyState("No open homework or school decisions.");
 }
 
 function reminderItemTemplate(item) {
@@ -269,6 +300,90 @@ function renderSupportRequests() {
   $("#supportList").innerHTML = filtered.length
     ? filtered.map(supportItemTemplate).join("")
     : emptyState("No support requests match this filter.");
+}
+
+function schoolStageLabel(stage) {
+  return {
+    researching: "Researching",
+    "tour-scheduled": "Tour scheduled",
+    applied: "Applied",
+    accepted: "Accepted",
+    declined: "Declined",
+    "decision-needed": "Decision needed"
+  }[stage] || "Researching";
+}
+
+function schoolItemTemplate(item) {
+  const statusClass = item.stage === "accepted" ? "good" : item.stage === "decision-needed" ? "warn" : "";
+  const deadline = item.deadline ? ` · Deadline ${formatDateTimeValue(`${item.deadline}T12:00`)}` : "";
+  return `
+    <div class="item" data-school-id="${item.id}">
+      <div class="item-header">
+        <div>
+          <p class="item-title">${escapeHtml(item.name)}</p>
+          <p class="item-meta">${item.child ? `${escapeHtml(item.child)} · ` : ""}${escapeHtml(item.priority)} priority${deadline}</p>
+        </div>
+        <span class="pill ${statusClass}">${schoolStageLabel(item.stage)}</span>
+      </div>
+      ${item.notes ? `<p>${escapeHtml(item.notes)}</p>` : ""}
+      <div class="item-actions">
+        <button class="secondary" type="button" data-action="send-school" data-id="${item.id}"><i data-lucide="send"></i><span>WhatsApp</span></button>
+        <button class="ghost" type="button" data-action="school-decision-needed" data-id="${item.id}">Decision needed</button>
+        <button class="ghost danger" type="button" data-action="delete-school" data-id="${item.id}">Delete</button>
+      </div>
+    </div>
+  `;
+}
+
+function renderSchoolOptions() {
+  const filter = $("#schoolFilter").value;
+  const filtered = sortByDateField(state.schoolOptions, "deadline").filter((item) => filter === "all" || item.stage === filter);
+  $("#schoolList").innerHTML = filtered.length
+    ? filtered.map(schoolItemTemplate).join("")
+    : emptyState("No school options match this filter.");
+}
+
+function homeworkStatusLabel(status) {
+  return {
+    "not-started": "Not started",
+    "in-progress": "In progress",
+    "needs-help": "Needs help",
+    submitted: "Submitted"
+  }[status] || "Not started";
+}
+
+function homeworkItemTemplate(item) {
+  const statusClass = item.status === "submitted" ? "good" : item.status === "needs-help" ? "warn" : "";
+  return `
+    <div class="item" data-homework-id="${item.id}">
+      <div class="item-header">
+        <div>
+          <p class="item-title">${escapeHtml(item.title)}</p>
+          <p class="item-meta">${item.child ? `${escapeHtml(item.child)} · ` : ""}${item.subject ? `${escapeHtml(item.subject)} · ` : ""}Due ${formatDateTimeValue(`${item.dueDate}T12:00`)}</p>
+        </div>
+        <span class="pill ${statusClass}">${homeworkStatusLabel(item.status)}</span>
+      </div>
+      ${item.notes ? `<p>${escapeHtml(item.notes)}</p>` : ""}
+      <div class="item-actions">
+        <button class="secondary" type="button" data-action="send-homework" data-id="${item.id}"><i data-lucide="send"></i><span>WhatsApp</span></button>
+        <button class="ghost" type="button" data-action="homework-needs-help" data-id="${item.id}">Needs help</button>
+        <button class="ghost" type="button" data-action="homework-submitted" data-id="${item.id}">Submitted</button>
+        <button class="ghost danger" type="button" data-action="delete-homework" data-id="${item.id}">Delete</button>
+      </div>
+    </div>
+  `;
+}
+
+function renderHomeworkItems() {
+  const filter = $("#homeworkFilter").value;
+  const filtered = sortByDateField(state.homeworkItems, "dueDate").filter((item) => {
+    if (filter === "open") return item.status !== "submitted";
+    if (filter === "all") return true;
+    return item.status === filter;
+  });
+  $("#homeworkList").innerHTML = filtered.length
+    ? filtered.map(homeworkItemTemplate).join("")
+    : emptyState("No homework items match this filter.");
 }
 
 function messageItemTemplate(item) {
@@ -382,6 +497,48 @@ function bindEvents() {
   $("#clearSupportForm").addEventListener("click", () => $("#supportForm").reset());
   $("#supportFilter").addEventListener("change", renderSupportRequests);
 
+  $("#schoolForm").addEventListener("submit", (event) => {
+    event.preventDefault();
+    const data = Object.fromEntries(new FormData(event.currentTarget));
+    state.schoolOptions.unshift({
+      id: crypto.randomUUID(),
+      name: data.name.trim(),
+      child: data.child.trim(),
+      stage: data.stage,
+      deadline: data.deadline,
+      priority: data.priority,
+      notes: data.notes.trim(),
+      createdAt: new Date().toISOString()
+    });
+    saveState();
+    event.currentTarget.reset();
+    render();
+    showToast("School option saved");
+  });
+
+  $("#schoolFilter").addEventListener("change", renderSchoolOptions);
+
+  $("#homeworkForm").addEventListener("submit", (event) => {
+    event.preventDefault();
+    const data = Object.fromEntries(new FormData(event.currentTarget));
+    state.homeworkItems.unshift({
+      id: crypto.randomUUID(),
+      title: data.title.trim(),
+      child: data.child.trim(),
+      subject: data.subject.trim(),
+      dueDate: data.dueDate,
+      status: data.status,
+      notes: data.notes.trim(),
+      createdAt: new Date().toISOString()
+    });
+    saveState();
+    event.currentTarget.reset();
+    render();
+    showToast("Homework item saved");
+  });
+
+  $("#homeworkFilter").addEventListener("change", renderHomeworkItems);
+
   document.addEventListener("click", (event) => {
     const button = event.target.closest("[data-action]");
     if (!button) return;
@@ -423,6 +580,44 @@ function bindEvents() {
       saveState();
       render();
       showToast("Support request deleted");
+    }
+    if (action === "send-school") {
+      const option = state.schoolOptions.find((item) => item.id === id);
+      window.open(whatsappUrl(schoolDecisionMessage(option)), "_blank", "noreferrer");
+    }
+    if (action === "school-decision-needed") {
+      const option = state.schoolOptions.find((item) => item.id === id);
+      option.stage = "decision-needed";
+      saveState();
+      render();
+    }
+    if (action === "delete-school") {
+      state.schoolOptions = state.schoolOptions.filter((item) => item.id !== id);
+      saveState();
+      render();
+      showToast("School option deleted");
+    }
+    if (action === "send-homework") {
+      const item = state.homeworkItems.find((homework) => homework.id === id);
+      window.open(whatsappUrl(homeworkMessage(item)), "_blank", "noreferrer");
+    }
+    if (action === "homework-needs-help") {
+      const item = state.homeworkItems.find((homework) => homework.id === id);
+      item.status = "needs-help";
+      saveState();
+      render();
+    }
+    if (action === "homework-submitted") {
+      const item = state.homeworkItems.find((homework) => homework.id === id);
+      item.status = "submitted";
+      saveState();
+      render();
+    }
+    if (action === "delete-homework") {
+      state.homeworkItems = state.homeworkItems.filter((item) => item.id !== id);
+      saveState();
+      render();
+      showToast("Homework item deleted");
     }
     if (action === "delete-agreement") {
       state.agreements = state.agreements.filter((item) => item.id !== id);
