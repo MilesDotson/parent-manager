@@ -18,6 +18,8 @@ A free, local-first co-parenting dashboard inspired by tools like MyFamilyWizard
 
 Free personal WhatsApp and WhatsApp Communities do not provide reliable auto-posting for third-party apps. This MVP uses WhatsApp share links so you can send prepared messages manually. A later hosted version could integrate WhatsApp Business Cloud API for supported one-to-one message templates, but Community automation is still limited.
 
+For privacy, do not commit co-parent phone numbers or emails to the public GitHub Pages source. Store those details in Settings inside the app, or keep a local ignored `private-*.json` profile file and import it from your own browser.
+
 ## Run locally
 
 From this folder:

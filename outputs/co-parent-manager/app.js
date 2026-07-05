@@ -701,10 +701,28 @@ function bindEvents() {
     if (!file) return;
     try {
       const imported = JSON.parse(await file.text());
-      state = { ...defaultState, ...imported };
+      const isProfileOnly = imported.settings && !["reminders", "agreements", "supportRequests", "schoolOptions", "homeworkItems", "messages"].some((key) => key in imported);
+      if (isProfileOnly) {
+        state = {
+          ...state,
+          settings: {
+            ...state.settings,
+            ...imported.settings
+          }
+        };
+      } else {
+        state = {
+          ...structuredClone(defaultState),
+          ...imported,
+          settings: {
+            ...defaultState.settings,
+            ...imported.settings
+          }
+        };
+      }
       saveState();
       render();
-      showToast("Data imported");
+      showToast(isProfileOnly ? "Profile imported" : "Data imported");
     } catch {
       showToast("Import failed");
     } finally {
