@@ -1,0 +1,308 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Parent Manager</title>
+    <link rel="stylesheet" href="./styles.css" />
+    <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js" defer></script>
+    <script src="./app.js" defer></script>
+  </head>
+  <body>
+    <header class="topbar">
+      <div>
+        <p class="eyebrow">Co-parenting workspace</p>
+        <h1>Parent Manager</h1>
+      </div>
+      <div class="topbar-actions">
+        <button class="icon-button" id="exportData" type="button" title="Export data">
+          <i data-lucide="download"></i><span>Export</span>
+        </button>
+        <label class="icon-button file-button" title="Import data">
+          <i data-lucide="upload"></i><span>Import</span>
+          <input id="importData" type="file" accept="application/json" />
+        </label>
+      </div>
+    </header>
+
+    <main class="layout">
+      <nav class="sidebar" aria-label="Main navigation">
+        <button class="nav-item is-active" type="button" data-view="dashboard">
+          <i data-lucide="layout-dashboard"></i><span>Dashboard</span>
+        </button>
+        <button class="nav-item" type="button" data-view="reminders">
+          <i data-lucide="bell-ring"></i><span>Reminders</span>
+        </button>
+        <button class="nav-item" type="button" data-view="mediator">
+          <i data-lucide="messages-square"></i><span>Mediator</span>
+        </button>
+        <button class="nav-item" type="button" data-view="agreements">
+          <i data-lucide="file-check-2"></i><span>Agreements</span>
+        </button>
+        <button class="nav-item" type="button" data-view="settings">
+          <i data-lucide="settings"></i><span>Settings</span>
+        </button>
+      </nav>
+
+      <section class="content">
+        <section class="view is-active" id="dashboard">
+          <div class="section-heading">
+            <div>
+              <p class="eyebrow">Today</p>
+              <h2>Shared parenting command center</h2>
+            </div>
+            <button class="primary" type="button" data-jump="reminders">
+              <i data-lucide="plus"></i><span>New reminder</span>
+            </button>
+          </div>
+
+          <div class="metric-grid">
+            <article class="metric">
+              <span id="openReminderCount">0</span>
+              <p>Open reminders</p>
+            </article>
+            <article class="metric">
+              <span id="dueSoonCount">0</span>
+              <p>Due in 48 hours</p>
+            </article>
+            <article class="metric">
+              <span id="agreementCount">0</span>
+              <p>Active agreements</p>
+            </article>
+            <article class="metric">
+              <span id="messageCount">0</span>
+              <p>Messages logged</p>
+            </article>
+          </div>
+
+          <div class="dashboard-grid">
+            <article class="panel">
+              <div class="panel-title">
+                <h3>Next reminders</h3>
+                <button class="ghost" type="button" data-jump="reminders">View all</button>
+              </div>
+              <div id="upcomingList" class="stack"></div>
+            </article>
+
+            <article class="panel">
+              <div class="panel-title">
+                <h3>Recent communication</h3>
+                <button class="ghost" type="button" data-jump="mediator">Draft</button>
+              </div>
+              <div id="recentMessages" class="stack"></div>
+            </article>
+          </div>
+        </section>
+
+        <section class="view" id="reminders">
+          <div class="section-heading">
+            <div>
+              <p class="eyebrow">WhatsApp-ready</p>
+              <h2>Reminders and requests</h2>
+            </div>
+            <button class="secondary" id="requestNotifications" type="button">
+              <i data-lucide="bell"></i><span>Browser alerts</span>
+            </button>
+          </div>
+
+          <div class="split">
+            <form class="panel form" id="reminderForm">
+              <h3>Create reminder</h3>
+              <label>
+                <span>Title</span>
+                <input name="title" required placeholder="Soccer pickup, dentist form, tuition reimbursement" />
+              </label>
+              <div class="two-col">
+                <label>
+                  <span>Child</span>
+                  <input name="child" placeholder="Child name" />
+                </label>
+                <label>
+                  <span>Category</span>
+                  <select name="category">
+                    <option>Exchange</option>
+                    <option>School</option>
+                    <option>Medical</option>
+                    <option>Expense</option>
+                    <option>Schedule</option>
+                    <option>Other</option>
+                  </select>
+                </label>
+              </div>
+              <div class="two-col">
+                <label>
+                  <span>Due date</span>
+                  <input name="date" type="date" required />
+                </label>
+                <label>
+                  <span>Due time</span>
+                  <input name="time" type="time" />
+                </label>
+              </div>
+              <label>
+                <span>Details</span>
+                <textarea name="details" rows="4" placeholder="Add facts, location, amount, or what decision is needed"></textarea>
+              </label>
+              <div class="button-row">
+                <button class="primary" type="submit">
+                  <i data-lucide="save"></i><span>Save reminder</span>
+                </button>
+                <button class="ghost" id="clearReminderForm" type="button">Clear</button>
+              </div>
+            </form>
+
+            <article class="panel">
+              <div class="panel-title">
+                <h3>Reminder list</h3>
+                <select id="reminderFilter" aria-label="Filter reminders">
+                  <option value="open">Open</option>
+                  <option value="all">All</option>
+                  <option value="done">Done</option>
+                </select>
+              </div>
+              <div id="reminderList" class="stack"></div>
+            </article>
+          </div>
+        </section>
+
+        <section class="view" id="mediator">
+          <div class="section-heading">
+            <div>
+              <p class="eyebrow">Message composer</p>
+              <h2>Neutral co-parenting drafts</h2>
+            </div>
+          </div>
+
+          <div class="split">
+            <form class="panel form" id="messageForm">
+              <h3>Draft a message</h3>
+              <label>
+                <span>Topic</span>
+                <input name="topic" required placeholder="Pickup time, missed payment, school form" />
+              </label>
+              <label>
+                <span>What happened</span>
+                <textarea name="facts" rows="5" required placeholder="Use plain facts. The app will turn this into a calmer draft."></textarea>
+              </label>
+              <div class="two-col">
+                <label>
+                  <span>Goal</span>
+                  <select name="goal">
+                    <option value="confirm">Confirm a plan</option>
+                    <option value="request">Make a request</option>
+                    <option value="document">Document an issue</option>
+                    <option value="deescalate">De-escalate</option>
+                  </select>
+                </label>
+                <label>
+                  <span>Tone</span>
+                  <select name="tone">
+                    <option value="brief">Brief</option>
+                    <option value="warm">Warm</option>
+                    <option value="firm">Firm</option>
+                  </select>
+                </label>
+              </div>
+              <button class="primary" type="submit">
+                <i data-lucide="wand-2"></i><span>Generate draft</span>
+              </button>
+            </form>
+
+            <article class="panel draft-panel">
+              <div class="panel-title">
+                <h3>Draft</h3>
+                <span id="toneScore" class="pill">No draft</span>
+              </div>
+              <textarea id="draftText" rows="11" placeholder="Your neutral draft will appear here."></textarea>
+              <div class="button-row">
+                <button class="secondary" id="copyDraft" type="button">
+                  <i data-lucide="copy"></i><span>Copy</span>
+                </button>
+                <a class="primary link-button" id="sendWhatsApp" href="#" target="_blank" rel="noreferrer">
+                  <i data-lucide="send"></i><span>Open WhatsApp</span>
+                </a>
+                <button class="ghost" id="logDraft" type="button">Log message</button>
+              </div>
+            </article>
+          </div>
+
+          <article class="panel">
+            <div class="panel-title">
+              <h3>Communication log</h3>
+              <button class="ghost danger" id="clearMessageLog" type="button">Clear log</button>
+            </div>
+            <div id="messageLog" class="stack"></div>
+          </article>
+        </section>
+
+        <section class="view" id="agreements">
+          <div class="section-heading">
+            <div>
+              <p class="eyebrow">Shared expectations</p>
+              <h2>Agreements and decisions</h2>
+            </div>
+          </div>
+
+          <div class="split">
+            <form class="panel form" id="agreementForm">
+              <h3>Add agreement</h3>
+              <label>
+                <span>Title</span>
+                <input name="title" required placeholder="Holiday exchange, expense split, bedtime calls" />
+              </label>
+              <label>
+                <span>Agreement</span>
+                <textarea name="body" rows="5" required placeholder="Write the exact shared decision or boundary."></textarea>
+              </label>
+              <button class="primary" type="submit">
+                <i data-lucide="plus"></i><span>Add agreement</span>
+              </button>
+            </form>
+
+            <article class="panel">
+              <div class="panel-title">
+                <h3>Active agreements</h3>
+                <button class="ghost" id="printAgreements" type="button">Print</button>
+              </div>
+              <div id="agreementList" class="stack"></div>
+            </article>
+          </div>
+        </section>
+
+        <section class="view" id="settings">
+          <div class="section-heading">
+            <div>
+              <p class="eyebrow">Integration</p>
+              <h2>WhatsApp and privacy settings</h2>
+            </div>
+          </div>
+
+          <form class="panel form settings-form" id="settingsForm">
+            <label>
+              <span>Co-parent display name</span>
+              <input name="coparentName" placeholder="Name used in draft messages" />
+            </label>
+            <label>
+              <span>Co-parent email</span>
+              <input name="coparentEmail" type="email" placeholder="name@example.com" />
+            </label>
+            <label>
+              <span>WhatsApp phone number</span>
+              <input name="whatsappPhone" placeholder="15551234567, optional" />
+            </label>
+            <label>
+              <span>WhatsApp community or group note</span>
+              <input name="communityName" placeholder="Community name, optional" />
+            </label>
+            <p class="note">Personal WhatsApp and Communities do not allow a free app to auto-post reliably. This app prepares clean messages and opens WhatsApp with the text ready to send. A future paid/API version can use WhatsApp Business Cloud API for supported one-to-one templates.</p>
+            <button class="primary" type="submit">
+              <i data-lucide="save"></i><span>Save settings</span>
+            </button>
+          </form>
+        </section>
+      </section>
+    </main>
+
+    <div class="toast" id="toast" role="status" aria-live="polite"></div>
+  </body>
+</html>
