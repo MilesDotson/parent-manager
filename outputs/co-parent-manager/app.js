@@ -32,6 +32,8 @@ const defaultState = {
   schoolOptions: [],
   homeworkItems: [],
   chatMessages: [],
+  selectedPlanDate: new Date().toISOString().slice(0, 10),
+  dailyPlans: {},
   messages: []
 };
 
@@ -171,6 +173,7 @@ function generateDraft({ topic, facts, goal, tone }) {
 }
 
 function render() {
+  renderPlanner();
   renderDashboard();
   renderReminders();
   renderSupportRequests();
@@ -185,6 +188,88 @@ function render() {
 
 function emptyState(text) {
   return `<div class="item"><p class="muted">${text}</p></div>`;
+}
+
+function plannerHours() {
+  return Array.from({ length: 15 }, (_, index) => index + 6);
+}
+
+function hourLabel(hour) {
+  const suffix = hour >= 12 ? "PM" : "AM";
+  const display = hour % 12 || 12;
+  return `${display}:00 ${suffix}`;
+}
+
+function getPlan(date = state.selectedPlanDate || new Date().toISOString().slice(0, 10)) {
+  if (!state.dailyPlans[date]) {
+    state.dailyPlans[date] = {
+      date,
+      focus: "",
+      tasks: [],
+      schedule: {},
+      interruptions: [],
+      carryover: ""
+    };
+  }
+  return state.dailyPlans[date];
+}
+
+function timeDots(actual, estimate) {
+  const total = Math.max(Number(actual) || 0, Number(estimate) || 0, 1);
+  return Array.from({ length: Math.min(total, 16) }, (_, index) => `<span class="time-dot ${index < actual ? "filled" : ""}"></span>`).join("");
+}
+
+function plannerTaskTemplate(task) {
+  return `
+    <div class="item planner-task ${task.done ? "done" : ""}" data-planner-task-id="${task.id}">
+      <div class="planner-task-grid">
+        <div>
+          <p class="item-title">${escapeHtml(task.title)}</p>
+          <p class="item-meta">${escapeHtml(task.category)} · estimate ${task.estimate} x 15 min · actual ${task.actual} x 15 min</p>
+        </div>
+        <span class="pill ${task.done ? "done" : ""}">${task.done ? "Done" : "Open"}</span>
+      </div>
+      <div class="time-blocks">${timeDots(task.actual, task.estimate)}</div>
+      <div class="item-actions">
+        <button class="ghost" type="button" data-action="planner-task-done" data-id="${task.id}">${task.done ? "Reopen" : "Done"}</button>
+        <button class="ghost" type="button" data-action="planner-task-add-block" data-id="${task.id}">+15 min</button>
+        <button class="ghost" type="button" data-action="planner-task-remove-block" data-id="${task.id}">-15 min</button>
+        <button class="ghost danger" type="button" data-action="planner-task-delete" data-id="${task.id}">Delete</button>
+      </div>
+    </div>
+  `;
+}
+
+function interruptionTemplate(item) {
+  return `
+    <div class="item" data-interruption-id="${item.id}">
+      <div class="item-header">
+        <p>${escapeHtml(item.text)}</p>
+        <button class="ghost danger" type="button" data-action="planner-interruption-delete" data-id="${item.id}">Delete</button>
+      </div>
+      <p class="item-meta">${new Date(item.createdAt).toLocaleString()}</p>
+    </div>
+  `;
+}
+
+function renderPlanner() {
+  const date = state.selectedPlanDate || new Date().toISOString().slice(0, 10);
+  const plan = getPlan(date);
+  $("#plannerDate").value = date;
+  $("#plannerFocus").value = plan.focus || "";
+  $("#plannerTaskList").innerHTML = plan.tasks.length
+    ? plan.tasks.map(plannerTaskTemplate).join("")
+    : emptyState("Pick three important co-parenting tasks for today.");
+  $("#plannerInterruptions").innerHTML = plan.interruptions.length
+    ? plan.interruptions.map(interruptionTemplate).join("")
+    : emptyState("Unexpected requests and distractions will appear here.");
+  $("#plannerCarryover").value = plan.carryover || "";
+  $("#plannerSchedule").innerHTML = plannerHours().map((hour) => `
+    <label class="schedule-row">
+      <span class="schedule-hour">${hourLabel(hour)}</span>
+      <input data-schedule-hour="${hour}" value="${escapeHtml(plan.schedule[hour] || "")}" placeholder="Block time, appointment, pickup, homework check" />
+    </label>
+  `).join("");
 }
 
 function renderDashboard() {
@@ -567,6 +652,63 @@ function bindEvents() {
     button.addEventListener("click", () => switchView(button.dataset.jump));
   });
 
+  $("#plannerDate").addEventListener("change", (event) => {
+    state.selectedPlanDate = event.target.value || new Date().toISOString().slice(0, 10);
+    getPlan(state.selectedPlanDate);
+    saveState();
+    render();
+  });
+
+  $("#plannerFocus").addEventListener("change", (event) => {
+    getPlan().focus = event.target.value.trim();
+    saveState();
+  });
+
+  $("#plannerTaskForm").addEventListener("submit", (event) => {
+    event.preventDefault();
+    const data = Object.fromEntries(new FormData(event.currentTarget));
+    getPlan().tasks.push({
+      id: crypto.randomUUID(),
+      title: data.title.trim(),
+      category: data.category,
+      estimate: Number(data.estimate) || 1,
+      actual: 0,
+      done: false,
+      createdAt: new Date().toISOString()
+    });
+    saveState();
+    event.currentTarget.reset();
+    event.currentTarget.estimate.value = 2;
+    render();
+    showToast("Planner task added");
+  });
+
+  $("#plannerInterruptionForm").addEventListener("submit", (event) => {
+    event.preventDefault();
+    const data = Object.fromEntries(new FormData(event.currentTarget));
+    getPlan().interruptions.unshift({
+      id: crypto.randomUUID(),
+      text: data.text.trim(),
+      createdAt: new Date().toISOString()
+    });
+    saveState();
+    event.currentTarget.reset();
+    render();
+    showToast("Interruption logged");
+  });
+
+  $("#plannerCarryover").addEventListener("change", (event) => {
+    getPlan().carryover = event.target.value.trim();
+    saveState();
+  });
+
+  $("#plannerSchedule").addEventListener("change", (event) => {
+    const input = event.target.closest("[data-schedule-hour]");
+    if (!input) return;
+    getPlan().schedule[input.dataset.scheduleHour] = input.value.trim();
+    saveState();
+  });
+
   $("#reminderForm").addEventListener("submit", (event) => {
     event.preventDefault();
     const data = Object.fromEntries(new FormData(event.currentTarget));
@@ -702,6 +844,38 @@ function bindEvents() {
     const button = event.target.closest("[data-action]");
     if (!button) return;
     const { action, id } = button.dataset;
+    if (action === "planner-task-done") {
+      const task = getPlan().tasks.find((item) => item.id === id);
+      task.done = !task.done;
+      saveState();
+      render();
+    }
+    if (action === "planner-task-add-block") {
+      const task = getPlan().tasks.find((item) => item.id === id);
+      task.actual = Math.min((Number(task.actual) || 0) + 1, 16);
+      saveState();
+      render();
+    }
+    if (action === "planner-task-remove-block") {
+      const task = getPlan().tasks.find((item) => item.id === id);
+      task.actual = Math.max((Number(task.actual) || 0) - 1, 0);
+      saveState();
+      render();
+    }
+    if (action === "planner-task-delete") {
+      const plan = getPlan();
+      plan.tasks = plan.tasks.filter((item) => item.id !== id);
+      saveState();
+      render();
+      showToast("Planner task deleted");
+    }
+    if (action === "planner-interruption-delete") {
+      const plan = getPlan();
+      plan.interruptions = plan.interruptions.filter((item) => item.id !== id);
+      saveState();
+      render();
+      showToast("Interruption deleted");
+    }
     if (action === "toggle-reminder") {
       const reminder = state.reminders.find((item) => item.id === id);
       reminder.done = !reminder.done;

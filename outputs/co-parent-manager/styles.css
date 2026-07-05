@@ -253,6 +253,90 @@ h3 {
   margin-bottom: 14px;
 }
 
+.date-control {
+  align-items: center;
+  display: grid;
+  gap: 6px;
+  min-width: 180px;
+}
+
+.planner-sheet {
+  align-items: start;
+  display: grid;
+  gap: 18px;
+  grid-template-columns: minmax(0, 1.35fr) minmax(280px, 0.65fr);
+}
+
+.planner-main {
+  display: grid;
+  gap: 18px;
+}
+
+.planner-side {
+  position: sticky;
+  top: 108px;
+}
+
+.planner-task-form {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: minmax(0, 1fr) 150px 96px auto;
+  margin-bottom: 14px;
+}
+
+.planner-task {
+  border-left: 5px solid var(--green);
+}
+
+.planner-task.done {
+  border-left-color: var(--blue);
+  opacity: 0.72;
+}
+
+.planner-task-grid {
+  align-items: center;
+  display: grid;
+  gap: 10px;
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+
+.time-blocks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.time-dot {
+  background: #d8e3de;
+  border-radius: 999px;
+  display: inline-block;
+  height: 13px;
+  width: 13px;
+}
+
+.time-dot.filled {
+  background: var(--green);
+}
+
+.schedule-grid {
+  display: grid;
+  gap: 8px;
+}
+
+.schedule-row {
+  align-items: center;
+  display: grid;
+  gap: 8px;
+  grid-template-columns: 64px minmax(0, 1fr);
+}
+
+.schedule-hour {
+  color: var(--muted);
+  font-size: 0.82rem;
+  font-weight: 800;
+  text-align: right;
+}
+
 .stack {
   display: grid;
   gap: 10px;
@@ -396,8 +480,13 @@ svg {
   .layout,
   .dashboard-grid,
   .split,
+  .planner-sheet,
   .metric-grid {
     grid-template-columns: 1fr;
+  }
+
+  .planner-side {
+    position: static;
   }
 
   .sidebar {
@@ -426,6 +515,11 @@ svg {
   }
 
   .two-col {
+    grid-template-columns: 1fr;
+  }
+
+  .planner-task-form,
+  .planner-task-grid {
     grid-template-columns: 1fr;
   }
 

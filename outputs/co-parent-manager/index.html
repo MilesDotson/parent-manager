@@ -28,8 +28,11 @@
 
     <main class="layout">
       <nav class="sidebar" aria-label="Main navigation">
-        <button class="nav-item is-active" type="button" data-view="dashboard">
-          <i data-lucide="layout-dashboard"></i><span>Dashboard</span>
+        <button class="nav-item is-active" type="button" data-view="planner">
+          <i data-lucide="clipboard-list"></i><span>Planner</span>
+        </button>
+        <button class="nav-item" type="button" data-view="dashboard">
+          <i data-lucide="layout-dashboard"></i><span>Overview</span>
         </button>
         <button class="nav-item" type="button" data-view="reminders">
           <i data-lucide="bell-ring"></i><span>Reminders</span>
@@ -55,7 +58,85 @@
       </nav>
 
       <section class="content">
-        <section class="view is-active" id="dashboard">
+        <section class="view is-active" id="planner">
+          <div class="section-heading">
+            <div>
+              <p class="eyebrow">Daily sheet</p>
+              <h2>Co-parenting emergent task planner</h2>
+            </div>
+            <label class="date-control">
+              <span>Date</span>
+              <input id="plannerDate" type="date" />
+            </label>
+          </div>
+
+          <div class="planner-sheet">
+            <section class="planner-main">
+              <article class="panel form">
+                <h3>Today's outcome</h3>
+                <label>
+                  <span>What needs to be true by tonight?</span>
+                  <input id="plannerFocus" placeholder="Example: school forms handled, homework checked, pickup plan confirmed" />
+                </label>
+              </article>
+
+              <article class="panel">
+                <div class="panel-title">
+                  <h3>Priority tasks</h3>
+                  <span class="pill">Estimate, then track</span>
+                </div>
+                <form class="planner-task-form" id="plannerTaskForm">
+                  <input name="title" required placeholder="Task, request, message, school follow-up" />
+                  <select name="category" aria-label="Task category">
+                    <option>Calendar</option>
+                    <option>Childcare</option>
+                    <option>School</option>
+                    <option>Homework</option>
+                    <option>Healthcare</option>
+                    <option>Expense</option>
+                    <option>Household</option>
+                    <option>Message</option>
+                  </select>
+                  <input name="estimate" type="number" min="1" max="16" value="2" aria-label="Estimated 15-minute blocks" />
+                  <button class="primary" type="submit"><i data-lucide="plus"></i><span>Add</span></button>
+                </form>
+                <div id="plannerTaskList" class="stack"></div>
+              </article>
+
+              <article class="panel">
+                <div class="panel-title">
+                  <h3>Interruptions and emergent work</h3>
+                  <span class="pill">Capture, do not chase</span>
+                </div>
+                <form class="planner-task-form" id="plannerInterruptionForm">
+                  <input name="text" required placeholder="Unexpected call, new request, conflict, school update" />
+                  <button class="secondary" type="submit"><i data-lucide="plus"></i><span>Log</span></button>
+                </form>
+                <div id="plannerInterruptions" class="stack"></div>
+              </article>
+
+              <article class="panel form">
+                <h3>Carry forward</h3>
+                <label>
+                  <span>What should move to the next planning sheet?</span>
+                  <textarea id="plannerCarryover" rows="4" placeholder="Unfinished items, tomorrow's first message, documents to collect, decisions still open"></textarea>
+                </label>
+              </article>
+            </section>
+
+            <aside class="planner-side">
+              <article class="panel">
+                <div class="panel-title">
+                  <h3>Time map</h3>
+                  <span class="pill">Block the day</span>
+                </div>
+                <div id="plannerSchedule" class="schedule-grid"></div>
+              </article>
+            </aside>
+          </div>
+        </section>
+
+        <section class="view" id="dashboard">
           <div class="section-heading">
             <div>
               <p class="eyebrow">Today</p>

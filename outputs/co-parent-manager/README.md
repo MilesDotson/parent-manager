@@ -1,9 +1,10 @@
 # Parent Manager
 
-A free, local-first co-parenting dashboard inspired by tools like MyFamilyWizard.
+A free, local-first co-parenting daily planner inspired by David Seah's Emergent Task Planner and tools like MyFamilyWizard.
 
 ## What it does
 
+- Gives you a single daily planning sheet for co-parenting priorities, time blocks, interruptions, and carry-forward notes.
 - Saves reminders for exchanges, school, medical items, expenses, and schedule changes.
 - Logs childcare support requests when coverage is needed during the other parent's parenting time.
 - Tracks school options, application stages, deadlines, and school-choice decisions.
