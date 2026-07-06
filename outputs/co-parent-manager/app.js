@@ -405,6 +405,53 @@ function draftChecks(text) {
   ];
 }
 
+function autoRouteIssue(text) {
+  const lowered = text.toLowerCase();
+  if (/(childcare|watch|cover|coverage|babysit|during your time|support request)/.test(lowered)) return "support";
+  if (/(homework|assignment|reading log|math|folder|submitted)/.test(lowered)) return "homework";
+  if (/(school|application|teacher|class|enrollment|tour|form)/.test(lowered)) return "school";
+  if (/(expense|receipt|reimburse|reimbursement|pay|payment|cost|invoice)/.test(lowered)) return "reminder";
+  if (/(doctor|medical|health|therapy|dentist|appointment|medication)/.test(lowered)) return "reminder";
+  if (/(pickup|dropoff|drop-off|schedule|calendar|exchange|time)/.test(lowered)) return "reminder";
+  if (/(reply|respond|message|text|whatsapp|ask|confirm)/.test(lowered)) return "message";
+  return "planner";
+}
+
+function quickTemplate(type) {
+  return {
+    childcare: {
+      route: "support",
+      text: "I need childcare support for ",
+      evidence: "WhatsApp or calendar"
+    },
+    school: {
+      route: "school",
+      text: "We need to decide or follow up on school selection: ",
+      evidence: "School portal or email"
+    },
+    homework: {
+      route: "homework",
+      text: "Homework needs monitoring or follow-up: ",
+      evidence: "Homework folder or school portal"
+    },
+    schedule: {
+      route: "reminder",
+      text: "Schedule or exchange needs confirmation: ",
+      evidence: "Calendar or WhatsApp"
+    },
+    expense: {
+      route: "reminder",
+      text: "Expense or reimbursement needs tracking: ",
+      evidence: "Receipt or payment record"
+    },
+    healthcare: {
+      route: "reminder",
+      text: "Healthcare item needs follow-up: ",
+      evidence: "Provider portal, referral, or appointment note"
+    }
+  }[type];
+}
+
 function plannerHours() {
   return Array.from({ length: 15 }, (_, index) => index + 6);
 }
@@ -872,15 +919,79 @@ function bindEvents() {
   $all("[data-jump]").forEach((button) => {
     button.addEventListener("click", () => switchView(button.dataset.jump));
   });
+  $all("[data-agent-template]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const template = quickTemplate(button.dataset.agentTemplate);
+      const form = $("#agentIntakeForm");
+      form.route.value = template.route;
+      form.text.value = template.text;
+      form.evidence.value = template.evidence;
+      form.text.focus();
+    });
+  });
 
   $("#agentIntakeForm").addEventListener("submit", (event) => {
     event.preventDefault();
     const data = Object.fromEntries(new FormData(event.currentTarget));
     const text = data.text.trim();
+    const route = data.route === "auto" ? autoRouteIssue(text) : data.route;
     const evidenceLine = data.evidence?.trim() ? `\nEvidence/source: ${data.evidence.trim()}` : "";
     const neededLine = data.neededBy ? `\nNeeded by: ${formatDateTimeValue(data.neededBy)}` : "";
     const routedText = `${text}${evidenceLine}${neededLine}`;
-    if (data.route === "message") {
+    const dueDate = data.neededBy ? data.neededBy.slice(0, 10) : new Date().toISOString().slice(0, 10);
+    if (route === "support") {
+      state.supportRequests.unshift({
+        id: crypto.randomUUID(),
+        reason: text,
+        child: "",
+        parentingTime: "other",
+        start: data.neededBy || new Date().toISOString().slice(0, 16),
+        end: "",
+        request: routedText,
+        response: "",
+        status: "requested",
+        requestedAt: new Date().toISOString().slice(0, 16),
+        createdAt: new Date().toISOString()
+      });
+    }
+    if (route === "homework") {
+      state.homeworkItems.unshift({
+        id: crypto.randomUUID(),
+        title: text,
+        child: "",
+        subject: "",
+        dueDate,
+        status: "needs-help",
+        notes: routedText,
+        createdAt: new Date().toISOString()
+      });
+    }
+    if (route === "school") {
+      state.schoolOptions.unshift({
+        id: crypto.randomUUID(),
+        name: text,
+        child: "",
+        stage: "decision-needed",
+        deadline: dueDate,
+        priority: data.priority,
+        notes: routedText,
+        createdAt: new Date().toISOString()
+      });
+    }
+    if (route === "reminder") {
+      state.reminders.push({
+        id: crypto.randomUUID(),
+        title: text,
+        child: "",
+        category: "Other",
+        date: dueDate,
+        time: data.neededBy ? data.neededBy.slice(11, 16) : "",
+        details: routedText,
+        done: false,
+        createdAt: new Date().toISOString()
+      });
+    }
+    if (route === "message") {
       switchView("mediator");
       $("#messageForm").topic.value = `${data.priority} priority follow-up`;
       $("#messageForm").facts.value = routedText;
@@ -897,7 +1008,7 @@ function bindEvents() {
       plan.tasks.push({
         id: crypto.randomUUID(),
         title: routedText,
-        category: data.route === "planner" ? "Message" : data.route.charAt(0).toUpperCase() + data.route.slice(1),
+        category: route === "planner" ? "Message" : route.charAt(0).toUpperCase() + route.slice(1),
         estimate: data.priority === "high" ? 3 : 2,
         actual: 0,
         done: false,
@@ -905,7 +1016,7 @@ function bindEvents() {
       });
       saveState();
       render();
-      showToast("Issue routed to planner");
+      showToast(`Managed as ${route}`);
     }
     event.currentTarget.reset();
   });

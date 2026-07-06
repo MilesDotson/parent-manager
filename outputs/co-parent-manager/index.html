@@ -65,7 +65,7 @@
           <div class="section-heading">
             <div>
               <p class="eyebrow">Manager mode</p>
-              <h2>Co-parenting agent desk</h2>
+              <h2>What needs to happen?</h2>
             </div>
             <button class="primary" type="button" data-action="agent-build-plan">
               <i data-lucide="sparkles"></i><span>Build today's plan</span>
@@ -101,9 +101,17 @@
 
             <aside class="agent-side">
               <form class="panel form" id="agentIntakeForm">
-                <h3>Route a new issue</h3>
+                <h3>Tell the manager</h3>
+                <div class="quick-actions">
+                  <button class="ghost" type="button" data-agent-template="childcare">Childcare</button>
+                  <button class="ghost" type="button" data-agent-template="school">School</button>
+                  <button class="ghost" type="button" data-agent-template="homework">Homework</button>
+                  <button class="ghost" type="button" data-agent-template="schedule">Schedule</button>
+                  <button class="ghost" type="button" data-agent-template="expense">Expense</button>
+                  <button class="ghost" type="button" data-agent-template="healthcare">Healthcare</button>
+                </div>
                 <label>
-                  <span>What needs managing?</span>
+                  <span>What needs to happen?</span>
                   <textarea name="text" rows="5" required placeholder="Paste a message, describe a request, or write the situation that needs a next step."></textarea>
                 </label>
                 <label>
@@ -118,6 +126,7 @@
                   <label>
                     <span>Route</span>
                     <select name="route">
+                      <option value="auto">Auto-route</option>
                       <option value="planner">Planner task</option>
                       <option value="message">Draft message</option>
                       <option value="support">Childcare support</option>
@@ -136,7 +145,7 @@
                   </label>
                 </div>
                 <button class="primary" type="submit">
-                  <i data-lucide="route"></i><span>Route issue</span>
+                  <i data-lucide="route"></i><span>Manage it</span>
                 </button>
               </form>
 

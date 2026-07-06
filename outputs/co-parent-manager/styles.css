@@ -285,6 +285,18 @@ h3 {
   top: 108px;
 }
 
+.quick-actions {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.quick-actions .ghost {
+  min-height: 36px;
+  padding: 8px;
+  width: 100%;
+}
+
 .briefing {
   display: grid;
   gap: 10px;
@@ -614,7 +626,8 @@ svg {
   }
 
   .planner-task-form,
-  .planner-task-grid {
+  .planner-task-grid,
+  .quick-actions {
     grid-template-columns: 1fr;
   }
 
