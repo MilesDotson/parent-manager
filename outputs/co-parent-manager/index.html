@@ -97,6 +97,20 @@
                 </div>
                 <div id="agentQueue" class="stack"></div>
               </article>
+
+              <article class="panel">
+                <div class="panel-title">
+                  <h3>Follow-through</h3>
+                  <span class="pill" id="followThroughCount">0 waiting</span>
+                </div>
+                <div class="button-row">
+                  <label class="secondary file-button">
+                    <i data-lucide="upload"></i><span>Load follow-up preload</span>
+                    <input id="followupImport" type="file" accept="application/json" />
+                  </label>
+                </div>
+                <div id="followThroughList" class="stack follow-through-list"></div>
+              </article>
             </section>
 
             <aside class="agent-side">

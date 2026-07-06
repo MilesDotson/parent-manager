@@ -367,8 +367,30 @@ function followUpMessage(item) {
   return `Hi${state.settings.coparentName ? ` ${state.settings.coparentName}` : ""}, following up on this so we can close the loop.\n\nTopic: ${item.title}\nOriginal request: ${item.request}\n${item.source ? `Source: ${item.source}\n` : ""}${item.lastAskedAt ? `Last asked: ${formatDateTimeValue(item.lastAskedAt)}\n` : ""}\nCan you please respond or confirm the next step?`;
 }
 
+function followThroughItemTemplate(item) {
+  return `
+    <div class="item agent-item ${item.status === "follow-up-due" ? "high" : "medium"}">
+      <div class="item-header">
+        <div>
+          <p class="item-title">${escapeHtml(item.title)}</p>
+          <p class="item-meta">${followUpStatusLabel(item.status)}${item.nextFollowUpAt ? ` · next ${formatDateTimeValue(item.nextFollowUpAt)}` : ""}</p>
+        </div>
+        <span class="pill ${item.status === "follow-up-due" ? "warn" : ""}">${followUpStatusLabel(item.status)}</span>
+      </div>
+      <p>${escapeHtml(item.request)}</p>
+      <div class="item-actions">
+        <button class="secondary" type="button" data-action="follow-up-again" data-id="${item.id}"><i data-lucide="send"></i><span>Ask again</span></button>
+        <button class="ghost" type="button" data-action="follow-up-responded" data-id="${item.id}">Responded</button>
+      </div>
+    </div>
+  `;
+}
+
 function renderAgentDesk() {
   const queue = agentQueueItems();
+  const openFollowUps = state.followUps
+    .filter((item) => !["responded", "closed"].includes(item.status))
+    .sort((a, b) => (a.nextFollowUpAt || "").localeCompare(b.nextFollowUpAt || ""));
   const high = queue.filter((item) => item.priority === "high").length;
   const openPlannerTasks = Object.values(state.dailyPlans || {}).flatMap((plan) => plan.tasks || []).filter((task) => !task.done).length;
   const checks = meticulousCheckRows(queue);
@@ -387,6 +409,10 @@ function renderAgentDesk() {
   $("#agentQueue").innerHTML = queue.length
     ? queue.map(agentItemTemplate).join("")
     : emptyState("No active items. Capture a new issue or import WhatsApp messages.");
+  $("#followThroughCount").textContent = `${openFollowUps.length} waiting`;
+  $("#followThroughList").innerHTML = openFollowUps.length
+    ? openFollowUps.slice(0, 8).map(followThroughItemTemplate).join("")
+    : emptyState("No follow-ups loaded yet. Use Load follow-up preload and select private-active-followups-import.json.");
 }
 
 function findAgentItem(type, id) {
@@ -928,6 +954,64 @@ function renderSettings() {
   form.coparentEmail.value = state.settings.coparentEmail || "";
   form.whatsappPhone.value = state.settings.whatsappPhone || "";
   form.communityName.value = state.settings.communityName || "";
+}
+
+async function importJsonFile(file) {
+  const imported = JSON.parse(await file.text());
+  const isProfileOnly = imported.settings && !["reminders", "agreements", "supportRequests", "schoolOptions", "homeworkItems", "messages"].some((key) => key in imported);
+  const isChatArchiveOnly = Array.isArray(imported.chatMessages) && Object.keys(imported).every((key) => key === "chatMessages");
+  const isMergeImport = imported.merge === true;
+  if (isProfileOnly) {
+    state = {
+      ...state,
+      settings: {
+        ...state.settings,
+        ...imported.settings
+      }
+    };
+    return "Profile imported";
+  }
+  if (isChatArchiveOnly) {
+    state = {
+      ...state,
+      chatMessages: dedupeChatMessages([...state.chatMessages, ...imported.chatMessages])
+        .sort((a, b) => b.timestamp.localeCompare(a.timestamp))
+    };
+    return "Chat archive imported";
+  }
+  if (isMergeImport) {
+    state = {
+      ...state,
+      settings: {
+        ...state.settings,
+        ...imported.settings
+      },
+      reminders: mergeById(state.reminders, imported.reminders),
+      agreements: mergeById(state.agreements, imported.agreements),
+      supportRequests: mergeById(state.supportRequests, imported.supportRequests),
+      schoolOptions: mergeById(state.schoolOptions, imported.schoolOptions),
+      homeworkItems: mergeById(state.homeworkItems, imported.homeworkItems),
+      followUps: mergeById(state.followUps, imported.followUps),
+      messages: mergeById(state.messages, imported.messages),
+      chatMessages: dedupeChatMessages([...state.chatMessages, ...(imported.chatMessages || [])])
+        .sort((a, b) => b.timestamp.localeCompare(a.timestamp)),
+      dailyPlans: {
+        ...state.dailyPlans,
+        ...imported.dailyPlans
+      },
+      selectedPlanDate: imported.selectedPlanDate || state.selectedPlanDate
+    };
+    return "Data merged";
+  }
+  state = {
+    ...structuredClone(defaultState),
+    ...imported,
+    settings: {
+      ...defaultState.settings,
+      ...imported.settings
+    }
+  };
+  return "Data imported";
 }
 
 function escapeHtml(value) {
@@ -1518,61 +1602,27 @@ function bindEvents() {
     const file = event.target.files[0];
     if (!file) return;
     try {
-      const imported = JSON.parse(await file.text());
-      const isProfileOnly = imported.settings && !["reminders", "agreements", "supportRequests", "schoolOptions", "homeworkItems", "messages"].some((key) => key in imported);
-      const isChatArchiveOnly = Array.isArray(imported.chatMessages) && Object.keys(imported).every((key) => key === "chatMessages");
-      const isMergeImport = imported.merge === true;
-      if (isProfileOnly) {
-        state = {
-          ...state,
-          settings: {
-            ...state.settings,
-            ...imported.settings
-          }
-        };
-      } else if (isChatArchiveOnly) {
-        state = {
-          ...state,
-          chatMessages: dedupeChatMessages([...state.chatMessages, ...imported.chatMessages])
-            .sort((a, b) => b.timestamp.localeCompare(a.timestamp))
-        };
-      } else if (isMergeImport) {
-        state = {
-          ...state,
-          settings: {
-            ...state.settings,
-            ...imported.settings
-          },
-          reminders: mergeById(state.reminders, imported.reminders),
-          agreements: mergeById(state.agreements, imported.agreements),
-          supportRequests: mergeById(state.supportRequests, imported.supportRequests),
-          schoolOptions: mergeById(state.schoolOptions, imported.schoolOptions),
-          homeworkItems: mergeById(state.homeworkItems, imported.homeworkItems),
-          followUps: mergeById(state.followUps, imported.followUps),
-          messages: mergeById(state.messages, imported.messages),
-          chatMessages: dedupeChatMessages([...state.chatMessages, ...(imported.chatMessages || [])])
-            .sort((a, b) => b.timestamp.localeCompare(a.timestamp)),
-          dailyPlans: {
-            ...state.dailyPlans,
-            ...imported.dailyPlans
-          },
-          selectedPlanDate: imported.selectedPlanDate || state.selectedPlanDate
-        };
-      } else {
-        state = {
-          ...structuredClone(defaultState),
-          ...imported,
-          settings: {
-            ...defaultState.settings,
-            ...imported.settings
-          }
-        };
-      }
+      const message = await importJsonFile(file);
       saveState();
       render();
-      showToast(isProfileOnly ? "Profile imported" : isChatArchiveOnly ? "Chat archive imported" : isMergeImport ? "Data merged" : "Data imported");
+      showToast(message);
     } catch {
       showToast("Import failed");
+    } finally {
+      event.target.value = "";
+    }
+  });
+
+  $("#followupImport").addEventListener("change", async (event) => {
+    const file = event.target.files[0];
+    if (!file) return;
+    try {
+      const message = await importJsonFile(file);
+      saveState();
+      render();
+      showToast(message);
+    } catch {
+      showToast("Follow-up import failed");
     } finally {
       event.target.value = "";
     }
