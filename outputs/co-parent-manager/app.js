@@ -412,7 +412,7 @@ function renderAgentDesk() {
   $("#followThroughCount").textContent = `${openFollowUps.length} waiting`;
   $("#followThroughList").innerHTML = openFollowUps.length
     ? openFollowUps.slice(0, 8).map(followThroughItemTemplate).join("")
-    : emptyState("No follow-ups loaded yet. Use Load follow-up preload and select private-active-followups-import.json.");
+    : emptyState("No follow-ups loaded yet. Import a follow-up JSON pack or create follow-ups from active issues.");
 }
 
 function findAgentItem(type, id) {
