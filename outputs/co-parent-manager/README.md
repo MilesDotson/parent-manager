@@ -6,6 +6,7 @@ A free, local-first co-parenting manager and agent. Start by telling it what nee
 
 - Gives you an Agent Desk that briefs you, prioritizes open issues, drafts next messages, and routes work into today's plan.
 - Auto-routes plain-language issues into childcare support, school, homework, schedule/reminder, expense, healthcare, or message workflows.
+- Tracks waiting-for-response follow-ups and prepares repeat follow-through drafts.
 - Practices meticulousness with evidence/date/next-action checks and a pre-send message checklist.
 - Includes a daily planning sheet for co-parenting priorities, time blocks, interruptions, and carry-forward notes.
 - Saves reminders for exchanges, school, medical items, expenses, and schedule changes.

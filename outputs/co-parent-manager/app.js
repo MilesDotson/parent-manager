@@ -32,6 +32,7 @@ const defaultState = {
   schoolOptions: [],
   homeworkItems: [],
   chatMessages: [],
+  followUps: [],
   selectedPlanDate: new Date().toISOString().slice(0, 10),
   dailyPlans: {},
   messages: []
@@ -244,6 +245,22 @@ function agentQueueItems() {
       plannerTitle: `School decision: ${item.name}`,
       facts: schoolDecisionMessage(item)
     }));
+  const followUpItems = state.followUps
+    .filter((item) => !["responded", "closed"].includes(item.status))
+    .map((item) => {
+      const due = item.nextFollowUpAt ? new Date(item.nextFollowUpAt).getTime() : 0;
+      const isDue = due && due <= Date.now();
+      return {
+        id: item.id,
+        type: "follow-up",
+        title: item.title,
+        detail: `${followUpStatusLabel(item.status)}${item.nextFollowUpAt ? ` · next ${formatDateTimeValue(item.nextFollowUpAt)}` : ""}`,
+        priority: isDue || item.status === "follow-up-due" ? "high" : "medium",
+        sourceView: "whatsapp",
+        plannerTitle: `Follow up: ${item.title}`,
+        facts: followUpMessage(item)
+      };
+    });
   const chatItems = state.chatMessages
     .filter((item) => /(school|homework|pickup|doctor|therapy|expense|reimburse|schedule|calendar|support)/i.test(item.text))
     .slice(0, 5)
@@ -258,7 +275,7 @@ function agentQueueItems() {
       facts: `${item.sender} wrote on ${new Date(item.timestamp).toLocaleString()}:\n${item.text}`
     }));
   const priorityWeight = { high: 0, medium: 1, low: 2 };
-  return [...supportItems, ...homeworkItems, ...schoolItems, ...reminderItems, ...chatItems]
+  return [...followUpItems, ...supportItems, ...homeworkItems, ...schoolItems, ...reminderItems, ...chatItems]
     .sort((a, b) => priorityWeight[a.priority] - priorityWeight[b.priority])
     .slice(0, 12);
 }
@@ -330,10 +347,24 @@ function agentItemTemplate(item) {
       <div class="item-actions">
         <button class="primary" type="button" data-action="agent-plan-item" data-agent-type="${item.type}" data-id="${item.id}"><i data-lucide="calendar-plus"></i><span>Plan</span></button>
         <button class="secondary" type="button" data-action="agent-draft-item" data-agent-type="${item.type}" data-id="${item.id}"><i data-lucide="wand-2"></i><span>Draft</span></button>
+        ${item.type === "follow-up" ? `<button class="ghost" type="button" data-action="follow-up-responded" data-id="${item.id}">Responded</button><button class="ghost" type="button" data-action="follow-up-again" data-id="${item.id}">Ask again</button>` : ""}
         <button class="ghost" type="button" data-action="agent-open-item" data-view="${item.sourceView}">Open</button>
       </div>
     </div>
   `;
+}
+
+function followUpStatusLabel(status) {
+  return {
+    waiting: "Waiting for response",
+    "follow-up-due": "Follow-up due",
+    responded: "Responded",
+    closed: "Closed"
+  }[status] || "Waiting for response";
+}
+
+function followUpMessage(item) {
+  return `Hi${state.settings.coparentName ? ` ${state.settings.coparentName}` : ""}, following up on this so we can close the loop.\n\nTopic: ${item.title}\nOriginal request: ${item.request}\n${item.source ? `Source: ${item.source}\n` : ""}${item.lastAskedAt ? `Last asked: ${formatDateTimeValue(item.lastAskedAt)}\n` : ""}\nCan you please respond or confirm the next step?`;
 }
 
 function renderAgentDesk() {
@@ -550,6 +581,7 @@ function renderDashboard() {
   $("#openHomeworkCount").textContent = openHomework.length;
   $("#schoolDecisionCount").textContent = schoolDecisions.length;
   $("#chatMessageCount").textContent = state.chatMessages.length;
+  $("#followUpCount").textContent = state.followUps.filter((item) => !["responded", "closed"].includes(item.status)).length;
 
   const upcoming = sortByDueDate(openReminders).slice(0, 5);
   $("#upcomingList").innerHTML = upcoming.length
@@ -1277,6 +1309,32 @@ function bindEvents() {
     if (action === "agent-open-item") {
       switchView(button.dataset.view);
     }
+    if (action === "follow-up-responded") {
+      const item = state.followUps.find((followUp) => followUp.id === id);
+      item.status = "responded";
+      item.respondedAt = new Date().toISOString();
+      saveState();
+      render();
+      showToast("Follow-up marked responded");
+    }
+    if (action === "follow-up-again") {
+      const item = state.followUps.find((followUp) => followUp.id === id);
+      item.status = "waiting";
+      item.lastAskedAt = new Date().toISOString();
+      item.nextFollowUpAt = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
+      saveState();
+      switchView("mediator");
+      $("#messageForm").topic.value = item.title;
+      $("#messageForm").facts.value = followUpMessage(item);
+      $("#draftText").value = generateDraft({
+        topic: item.title,
+        facts: followUpMessage(item),
+        goal: "request",
+        tone: "firm"
+      });
+      updateDraftActions($("#draftText").value);
+      showToast("Follow-up draft prepared");
+    }
     if (action === "toggle-reminder") {
       const reminder = state.reminders.find((item) => item.id === id);
       reminder.done = !reminder.done;
@@ -1490,6 +1548,7 @@ function bindEvents() {
           supportRequests: mergeById(state.supportRequests, imported.supportRequests),
           schoolOptions: mergeById(state.schoolOptions, imported.schoolOptions),
           homeworkItems: mergeById(state.homeworkItems, imported.homeworkItems),
+          followUps: mergeById(state.followUps, imported.followUps),
           messages: mergeById(state.messages, imported.messages),
           chatMessages: dedupeChatMessages([...state.chatMessages, ...(imported.chatMessages || [])])
             .sort((a, b) => b.timestamp.localeCompare(a.timestamp)),
